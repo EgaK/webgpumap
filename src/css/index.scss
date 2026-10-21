@@ -1,0 +1,58 @@
+$mainColor: #ffa725;
+$mainColorLight: #ffcd50;
+$mainColorBright: #feeaa5;
+$mainColorDark: #a76400;
+$accentColor: #3f51b5;
+$accentColorSub: #c5cae9;
+$white: #fff;
+$darkGray: #666;
+$gray: #aaa;
+$lightGray: #eee;
+$skyBlue: #e3f2fd;
+$halfTrans: rgba(255, 255, 255, 0.5);
+$boxShadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
+$boxShadowInset: 0 1px 1px rgba(0, 0, 0, 0.1) inset;
+$boxShadowFloat: 1px 3px 3px rgba(0, 0, 0, 0.1);
+$emboss:
+    1px 1px 0px rgba(255, 255, 255, 0.5),
+    -1px -1px 0px rgba(0, 0, 0, 0.1);
+$overlayColor: rgba(0, 0, 0, 0.5);
+$bounce: cubic-bezier(0.4, 1.6, 0.5, 0.8);
+
+* {
+    margin: 0;
+    padding: 0;
+    position: relative;
+    box-sizing: border-box;
+}
+
+body {
+    font-size: 16px;
+    font-family:
+        "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans",
+        Meiryo, sans-serif;
+    font-feature-settings: "palt" 1;
+    line-break: strict;
+    word-break: auto-phrase;
+    text-autospace: normal;
+    background: $lightGray;
+    color: $darkGray;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    height: 100vh;
+    overflow-x: hidden;
+    touch-action: manipulation;
+}
+
+canvas {
+    border: 1px solid #333;
+    // width: 400px;
+    // height: 400px;
+    display: inline-block;
+}
+#m {
+    margin: 30px auto;
+    text-align: center;
+}

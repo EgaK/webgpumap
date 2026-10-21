@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebGPU Perfect Sharp Vector Concave Polygon (SDF)</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #1a1a1a;
+        font-family: sans-serif;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #instructions {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: white;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px;
+        border-radius: 8px;
+        pointer-events: none;
+      }
+      h1 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+      p {
+        margin: 5px 0;
+        font-size: 14px;
+        color: #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="instructions">
+      <h1>WebGPU SDF無限解像度ベクター描画</h1>
+      <p>⚡ <b>手法:</b> フラグメントシェーダーによる数式（SDF）判定</p>
+      <p>
+        🖱️ <b>ドラッグ:</b> 移動 / 📜
+        <b>ホイール:</b> 超拡大しても100%ボケないエッジ
+      </p>
+    </div>
+
+    <canvas id="gpuCanvas"></canvas>
+
+    <script src="index.js"></script>
+  </body>
+</html>

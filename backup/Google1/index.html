@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>WebGPU Dynamic Thick Line with Style Controls</title>
+        <style>
+            body {
+                margin: 0;
+                background: #222;
+                font-family: sans-serif;
+                color: #fff;
+                padding: 20px;
+            }
+            .controls {
+                margin-bottom: 15px;
+                display: flex;
+                gap: 15px;
+                align-items: center;
+                flex-wrap: wrap;
+                background: #333;
+                padding: 15px;
+                border-radius: 6px;
+            }
+            .control-group {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            input[type="text"] {
+                width: 350px;
+                padding: 8px;
+                border-radius: 4px;
+                border: 1px solid #555;
+                background: #222;
+                color: #fff;
+            }
+            input[type="range"] {
+                width: 100px;
+            }
+            input[type="color"] {
+                border: none;
+                padding: 0;
+                width: 40px;
+                height: 30px;
+                cursor: pointer;
+                background: transparent;
+            }
+            button {
+                padding: 8px 15px;
+                background: #0070f3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+            }
+            button:hover {
+                background: #0051cb;
+            }
+            canvas {
+                display: block;
+                width: 500px;
+                height: 500px;
+                /*background: #111;*/
+                border: 1px solid #444;
+                margin-top: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="controls">
+            <!-- 1. 通常の太い線用のコントロール -->
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="lineCoordsInput"
+                        >線の座標リスト (X,Y X,Y ...):</label
+                    >
+                    <input
+                        type="text"
+                        id="lineCoordsInput"
+                        value="100,100 300,500 500,200"
+                    />
+                </div>
+                <div class="control-group">
+                    <label for="lineColorInput">線の色:</label>
+                    <input type="color" id="lineColorInput" value="#00bfff" />
+                </div>
+            </div>
+
+            <!-- 2. 閉じたポリゴン用のコントロール -->
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="polyCoordsInput"
+                        >ポリゴン座標 (X,Y X,Y ...):</label
+                    >
+                    <input
+                        type="text"
+                        id="polyCoordsInput"
+                        value="500,500 800,500 800,800 500,800"
+                    />
+                </div>
+                <div class="control-group">
+                    <label for="polyColorInput">ポリゴンの色:</label>
+                    <input type="color" id="polyColorInput" value="#ff007f" />
+                </div>
+            </div>
+
+            <!-- 共通の線幅コントロール -->
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="widthInput">線幅:</label>
+                    <input
+                        type="range"
+                        id="widthInput"
+                        min="1"
+                        max="100"
+                        value="15"
+                    />
+                    <span id="widthValue">15px</span>
+                </div>
+                <button id="drawButton">描画リフレッシュ</button>
+            </div>
+        </div>
+
+        <div id="m">
+            <canvas></canvas>
+        </div>
+
+        <script src="/index.js"></script>
+    </body>
+</html>
