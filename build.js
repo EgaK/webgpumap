@@ -66,7 +66,10 @@ async function jsBuild() {
       outdir: "dist/statics",
       format: "esm",
       target: "es2020",
-      define: { "DEVELOP": "true" },
+      define: {
+        "DEVELOP": "true",
+        "WORKERCODE": "0",
+      },
       plugins: [
         glsl({
           minify: true, // ★ WGSL/GLSLファイルをインポート時に自動でMinifyする

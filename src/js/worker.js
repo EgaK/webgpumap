@@ -1,5 +1,37 @@
 var canvas, render;
 
+/*
+// worker.js (Workerスレッド)
+let viewArray; // メインから共有されるSABのビュー
+let device, uniformBuffer, pipeline; // WebGPU関係の変数
+
+self.onmessage = async (e) => {
+  if (e.data.type === 'INIT_MEM') {
+    // メインから送られてきたSABを受け取る
+    viewArray = new Float64Array(e.data.sab);
+
+    // ここでWebGPUの初期化やバッファ作成を行う（以前index.jsでやっていた処理）
+    await initWebGPU();
+
+    // 描画ループをスタート
+    requestAnimationFrame(renderLoop);
+  }
+};
+
+function renderLoop() {
+  // ★ここがポイント！
+  // 以前はファイルの先頭の変数を読んでいた箇所を、SABからの読み込みに変えるだけ！
+  const currentX = viewArray[0];
+  const currentY = viewArray[1];
+  const currentZoom = viewArray[2];
+
+  // あとは以前1ファイルでやっていた、Uniform Bufferの更新と描画コマンドの発行
+  updateUniformBuffer(currentX, currentY, currentZoom);
+  draw();
+
+  requestAnimationFrame(renderLoop);
+}*/
+
 self.onmessage = async (e) => {
   if (e.data.canvas) {
     canvas = e.data.canvas;

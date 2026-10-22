@@ -153,7 +153,9 @@ var tiny_default = $;
   if (true) {
     worker = new Worker("/worker.js");
   } else {
-    worker = new Worker("/worker2.js");
+    var blob = new Blob([0], { type: "application/javascript" });
+    var workerUrl = URL.createObjectURL(blob);
+    worker = new Worker(workerUrl);
   }
   worker.postMessage({ canvas: offcanvas, size: [800, 800] }, [offcanvas]);
   const container = tiny_default("#m");

@@ -1,5 +1,25 @@
 import $ from "./util/tiny";
 
+// // index.js (メインスレッド)
+// const sab = new SharedArrayBuffer(24);
+// const viewArray = new Float64Array(sab);
+//
+// // 初期値
+// viewArray[0] = 0; // X
+// viewArray[1] = 0; // Y
+// viewArray[2] = 1; // Zoom
+//
+// // Workerを起動して、このメモリの「住所」を教えてあげる
+// const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+// worker.postMessage({ type: 'INIT_MEM', sab });
+// // マウスイベント（以前のコードの wheel 等）
+// window.addEventListener('wheel', (e) => {
+//   // 直接変数を書き換える代わりに、SABの配列の中身を書き換える
+//   viewArray[2] += e.deltaY * 0.001;
+//
+//   // 必要なら、ここで前述の CustomEvent を発行して他のUIに通知する
+// });
+
 (async () => {
   if (!navigator.gpu) {
     alert("お使いのブラウザのバージョンが古いため地図が表示されません");
@@ -15,7 +35,9 @@ import $ from "./util/tiny";
   if (DEVELOP) {
     worker = new Worker("/worker.js");
   } else {
-    worker = new Worker("/worker2.js");
+    var blob = new Blob([WORKERCODE], { type: "application/javascript" });
+    var workerUrl = URL.createObjectURL(blob);
+    worker = new Worker(workerUrl);
   }
   worker.postMessage({ canvas: offcanvas, size: [800, 800] }, [offcanvas]);
 
