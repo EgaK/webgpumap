@@ -287,7 +287,10 @@ function htmlCompose() {
     const css = fs.readFileSync(`tmp/${file}.css`, "utf8");
     const html = fs
       .readFileSync(`tmp/${file}.html`, "utf8")
-      .replace(/<style>.*<\/style>/m, `<style>${css}</style>`);
+      .replace(
+        /<style>.*<\/style>/m,
+        `<meta content=${new Date().toISOString()} name=revised /><style>${css}</style>`,
+      );
 
     const minified = htmlMinifier(html, {
       removeAttributeQuotes: true,
@@ -303,7 +306,11 @@ function htmlCompose() {
       // minifyCSS: true,
       maxLineLength: 500,
     });
-    fs.writeFileSync(projDir + `/dist/statics/${file}.html`, minified, "utf8");
+    fs.writeFileSync(
+      projDir + `/dist/workers/template/${file}.html`,
+      minified,
+      "utf8",
+    );
   }
   log(`\u001b[35mhtml files composed\u001b[0m`);
 }
