@@ -1,5 +1,9 @@
 const fs = require("fs");
-const { exec } = require("child_process");
+const { execFile, exec } = require("child_process");
+// const compilerPackage = require("google-closure-compiler");
+// // const ClosureCompiler = compilerPackage.compiler;
+// const ClosureCompiler =
+//   "/opt/homebrew/Cellar/closure-compiler/20261020/bin/closure-compiler";
 const esbuild = require("esbuild");
 const { glsl } = require("esbuild-plugin-glsl");
 const htmlMinifier = require("html-minifier").minify;
@@ -10,11 +14,7 @@ const path = process.argv[2];
 const projDir = process.argv[3];
 const cat = path.replace(projDir + "/src", "").split("/")[1];
 const fileName = path.substring(path.lastIndexOf("/") + 1);
-
-const jsfile = "edit.js";
-// user.js,
-// edit.js',
-// admin.js',
+const isProd = process.argv.includes("--prod");
 
 try {
   switch (cat) {
@@ -38,61 +38,199 @@ try {
   log(e);
 }
 
-function jsBuild(path) {
+async function jsBuild() {
+  // console.log(JSON.stringify(compilerPackage));
+  // return;
   const startT = Date.now();
-  esbuild.build({
-    entryPoints: [projDir + "/src/js/index.js", projDir + "/src/js/worker.js"],
-    outdir: projDir + "/dist/statics/",
-    platform: "browser",
-    bundle: true,
-    // splitting: true,
-    format: "esm",
-    // chunkNames: "common-[hash]",
-    plugins: [
-      {
-        name: "example",
-        setup(build) {
-          build.onLoad({ filter: /\.js?/ }, async (args) => {
-            let text = await fs.promises.readFile(args.path, "utf8");
-            return {
-              contents: text.replace(/DEBUG/g, true),
-              loader: "jsx",
-            };
-          });
+
+  function runClosure(args) {
+    return new Promise((resolve, reject) => {
+      exec(
+        `google-closure-compiler ${args.join(" ")}`,
+        { maxBuffer: 1024 * 1024 * 10 },
+        (error, stdout, stderr) => {
+          if (error) reject(stderr);
+          else resolve({ stdout, stderr });
         },
+      );
+    });
+  }
+
+  if (!isProd) {
+    await esbuild.build({
+      entryPoints: {
+        "index": "src/js/index.js",
+        "worker": "src/js/worker.js",
       },
-      glsl({
-        minify: true, // ★ WGSL/GLSLファイルをインポート時に自動でMinifyする
-      }),
-    ],
-    // minify: true,
-    loader: {
-      ".js": "jsx",
-      ".wgsl": "text",
-    },
-    jsxFactory: "h",
-    jsxFragment: "Fragment",
-    // drop: process.argv[3] == "false" ? ["console", "debugger"] : [],
-  });
+      bundle: true,
+      outdir: "dist/statics",
+      format: "esm",
+      target: "es2020",
+      define: { "DEVELOP": "true" },
+      plugins: [
+        glsl({
+          minify: true, // ★ WGSL/GLSLファイルをインポート時に自動でMinifyする
+        }),
+      ],
+    });
 
-  var cmds = `
-      cd dist/statics
-      google-closure-compiler --js index.js --js_output_file index.min.js --externs ../../closure-externs.js --warning_level QUIET --compilation_level ADVANCED --create_source_map index.map  --output_wrapper "%output%//# sourceMappingURL=/index.map"
-    `;
+    // あえてworkerとindexを別にコンパイルしてプロパティ名圧縮で対策してないと問題がおきるようにしてる
+    await Promise.all([
+      runClosure([
+        "--compilation_level",
+        "ADVANCED_OPTIMIZATIONS",
+        "--language_in",
+        "ECMASCRIPT_2020",
+        "--language_out",
+        "ECMASCRIPT_2020",
+        "--js",
+        "dist/statics/worker.js",
+        "--js_output_file",
+        "dist/statics/worker.min.js",
+        "--create_source_map",
+        "dist/statics/worker.map",
+        "--source_map_location_mapping",
+        "'dist/statics/|/'",
+        "--output_wrapper",
+        "'%output%//# sourceMappingURL=/worker.map'",
+        "--externs",
+        "closure-externs.js",
+        "--warning_level",
+        "QUIET",
+      ]),
+      runClosure([
+        "--compilation_level",
+        "ADVANCED_OPTIMIZATIONS",
+        "--language_in",
+        "ECMASCRIPT_2020",
+        "--language_out",
+        "ECMASCRIPT_2020",
+        "--js",
+        "dist/statics/index.js",
+        "--js_output_file",
+        "dist/statics/index.min.js",
+        "--create_source_map",
+        "dist/statics/index.map",
+        "--source_map_location_mapping",
+        "'dist/statics/|/'",
+        "--output_wrapper",
+        "'%output%//# sourceMappingURL=/index.map'",
+        "--externs",
+        "closure-externs.js",
+        "--warning_level",
+        "QUIET",
+      ]),
+    ]);
 
-  exec(cmds, (error, stdout, stderr) => {
-    // エラー出力
-    if (error) log(`\u001b[35merror:\u001b[0m ${error}`);
-    // 標準出力
-    if (stdout)
-      log(`\u001b[35mstdout:\u001b[0m ${stdout} ${Date.now() - startT}ms`);
-    // 標準エラー出力
-    if (stderr) log(`\u001b[35mstderr:\u001b[0m ${stderr}`);
-    log(
-      `\u001b[35mClosure compiler build Javascript\u001b[0m ${Date.now() - startT}ms`,
+    log(`\u001b[35mbuild Javascript\u001b[0m ${Date.now() - startT}ms`);
+  } else {
+    // ==========================================
+    // 🚀 本番モード（2ステップ・ビルド）
+    // ==========================================
+
+    // 1-1. WorkerのTSをesbuildでJSにバンドル
+    await esbuild.build({
+      entryPoints: ["src/my-worker.ts"],
+      bundle: true,
+      outfile: "dist/tmp/worker.raw.js",
+      format: "esm",
+      target: "es2022",
+      define: { "DEVELOP": "0" },
+    });
+
+    // 1-2. WorkerのJSをClosure Compiler Advancedに通す
+    // ★ここでメインコードと同じリネーム規則（同じ型定義・共通ルール）が適用されるようにします
+    await runClosure([
+      "--compilation_level",
+      "ADVANCED_OPTIMIZATIONS",
+      "--language_in",
+      "ECMASCRIPT_2022",
+      "--language_out",
+      "ECMASCRIPT_2022",
+      "--define",
+      "DEVELOP=",
+      "--js",
+      "dist/tmp/worker.raw.js",
+      "--js_output_file",
+      "dist/tmp/worker.min.js",
+    ]);
+
+    // 1-3. 圧縮されたWorkerのコード（文字列）を読み込む
+    const minifiedWorkerCode = fs.readFileSync(
+      "dist/tmp/worker.min.js",
+      "utf8",
     );
-  });
-  // log(`\u001b[35mbuild Javascript\u001b[0m ${Date.now() - startT}ms`);
+
+    console.log(
+      "ステップ 2: メインコードのコンパイルとWorkerのインライン化...",
+    );
+
+    // 2-1. esbuildでメインコードをバンドル
+    // この際、esbuildの `define` を使って、コード内の `WORKER_CODE` という定数を
+    // 先ほど圧縮したWorkerの「文字列データ」に直接置き換えます。
+    const result = await esbuild.build({
+      entryPoints: {
+        "base": "src/base.ts",
+        "edit": "src/edit.ts",
+        "admin": "src/admin.ts",
+      },
+      bundle: true,
+      write: true,
+      outdir: "dist/tmp/main",
+      format: "esm",
+      metafile: true,
+      target: "es2022",
+      define: {
+        "DEVELOP": "0",
+        // Workerのソースコードを文字列リテラルとして丸ごと注入
+        "WORKER_CODE": JSON.stringify(minifiedWorkerCode),
+      },
+    });
+
+    // 2-2. メインコードの Closure Compiler 実行（引数自動組み立て）
+    const outputs = result.metafile.outputs;
+    const chunkArgs = [];
+    const jsFiles = [];
+    const chunkConfig = {
+      "base": { parent: null },
+      "edit": { parent: "base" },
+      "admin": { parent: "edit" },
+    };
+
+    Object.keys(chunkConfig).forEach((name) => {
+      const config = chunkConfig[name];
+      const actualFile = Object.keys(outputs).find((p) =>
+        p.endsWith(`${name}.js`),
+      );
+      if (!actualFile) return;
+      jsFiles.push("--js", actualFile);
+      let chunkStr = `${name}:1`;
+      if (config.parent) chunkStr += `:${config.parent}`;
+      chunkArgs.push("--chunk", chunkStr);
+    });
+
+    // メインのClosure実行引数
+    const closureArgs = [
+      "--compilation_level",
+      "ADVANCED_OPTIMIZATIONS",
+      "--language_in",
+      "ECMASCRIPT_2022",
+      "--language_out",
+      "ECMASCRIPT_2022",
+      "--define",
+      "DEVELOP=0",
+      ...jsFiles,
+      ...chunkArgs,
+      "--chunk_output_path_prefix",
+      "dist/js/",
+    ];
+
+    await runClosure(closureArgs);
+
+    // 一時ファイルのクリーンアップ
+    // fs.rmSync("dist/tmp", { recursive: true, force: true });
+    log(`\u001b[35mbuild Javascript\u001b[0m ${Date.now() - startT}ms`);
+  }
 }
 
 function copyHtml() {

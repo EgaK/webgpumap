@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      esbuild:
-        specifier: ^0.28.2
-        version: 0.28.2
       esbuild-plugin-glsl:
         specifier: ^1.4.2
         version: 1.4.2(esbuild@0.28.2)

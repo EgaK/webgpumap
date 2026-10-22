@@ -1,9 +1,7 @@
-// import { delay } from "./delay";
-
 var isString = (obj) => (typeof obj)[0] == "s";
 function Tiny() {}
 
-export default (selector) => {
+var $ = (selector) => {
   if (isString(selector)) {
     if (selector[0] == "<") {
       var container = document.createElement("div");
@@ -163,3 +161,5 @@ Tiny.prototype = {
   //   });
   // },
 };
+
+export default $;

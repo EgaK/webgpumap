@@ -1,24 +1,18 @@
-var canvas, render, lineWidth, linePoints, polyPoints, lineColor, polyColor;
-let offsetX = 0;
-let offsetY = 0;
+var canvas, render;
 
-onmessage = async (e) => {
+self.onmessage = async (e) => {
   if (e.data.canvas) {
     canvas = e.data.canvas;
     init(canvas);
   }
-  e.data.deltaXY &&
+  e.data.pos &&
     requestAnimationFrame(() => {
-      [offsetX, offsetY] = e.data.deltaXY;
       render();
+      // draw(e.data.pos);
     });
   if (e.data.size) {
     [canvas.width, canvas.height] = e.data.size;
     // render実行しないとcanvasの大きさ変更が実canvasに反映されない
-    render?.();
-  }
-  if (e.data.lineWidth) {
-    ({ lineWidth, linePoints, polyPoints, lineColor, polyColor } = e.data);
     render?.();
   }
 };
@@ -31,257 +25,292 @@ const init = async (canvas) => {
   ctx.configure({
     device,
     format: presentationFormat,
-    alphaMode: "opaque",
   });
 
-  // 3. WGSL シェーダーコード
-  const shaderModule = device.createShaderModule({
-    code: `
-      struct DrawUniforms {
-          color: vec4f,
-          offset: vec2f,
-      }
-      @group(0) @binding(0) var<uniform> uniforms: DrawUniforms;
-      struct VertexOutput {
-        @builtin(position) position: vec4f,
-      }
+  const module = device.createShaderModule({
+    code: /* wgsl */ `
+        struct Vertex {
+          @location(0) position: vec2f,
+          @location(1) color: vec4f,
+          @location(2) offset: vec2f,
+          @location(3) scale: vec2f,
+          @location(4) perVertexColor: vec3f,
+        };
 
-      @vertex
-      fn vs_main(@location(0) pos: vec2f) -> VertexOutput {
-          var output: VertexOutput;
-          let finalPos = pos + uniforms.offset;
-          output.position = vec4f((finalPos.x / 1000.0) * 2.0 - 1.0, 1.0 - (finalPos.y / 1000.0) * 2.0, 0.0, 1.0);
-          return output;
-      }
+        struct VSOutput {
+          @builtin(position) position: vec4f,
+          @location(0) color: vec4f,
+        };
 
-      @fragment
-      fn fs_main() -> @location(0) vec4f { return uniforms.color; }
-  `,
+        @vertex fn vs(
+          vert: Vertex,
+        ) -> VSOutput {
+          var vsOut: VSOutput;
+          vsOut.position = vec4f(
+              vert.position * vert.scale + vert.offset, 0.0, 1.0);
+          vsOut.color = vert.color * vec4f(vert.perVertexColor, 1);
+          return vsOut;
+        }
+
+        @fragment fn fs(vsOut: VSOutput) -> @location(0) vec4f {
+          return vsOut.color;
+        }
+      `,
   });
 
-  // 4. パイプライン設定
   const pipeline = device.createRenderPipeline({
+    label: "per vertex color",
     layout: "auto",
     vertex: {
-      module: shaderModule,
-      entryPoint: "vs_main",
+      module,
       buffers: [
         {
-          arrayStride: 8,
+          arrayStride: 2 * 4 + 4, // 2 floats, 4 bytes each + 4 bytes
           attributes: [
-            {
-              shaderLocation: 0,
-              offset: 0,
-              format: "float32x2",
-            },
+            { shaderLocation: 0, offset: 0, format: "float32x2" }, // position
+            { shaderLocation: 4, offset: 8, format: "unorm8x4" }, // perVertexColor
+          ],
+        },
+        {
+          arrayStride: 4 + 2 * 4, // 4 bytes + 2 floats, 4 bytes each
+          stepMode: "instance",
+          attributes: [
+            { shaderLocation: 1, offset: 0, format: "unorm8x4" }, // color
+            { shaderLocation: 2, offset: 4, format: "float32x2" }, // offset
+          ],
+        },
+        {
+          arrayStride: 2 * 4, // 2 floats, 4 bytes each
+          stepMode: "instance",
+          attributes: [
+            { shaderLocation: 3, offset: 0, format: "float32x2" }, // scale
           ],
         },
       ],
     },
     fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
+      module,
       targets: [{ format: presentationFormat }],
     },
-    primitive: { topology: "triangle-list" },
   });
 
-  // 5. 太い線の頂点データ計算関数 (マイタージョイン)
-  function generateLineStripVertices(points, lineWidth) {
-    if (points.length < 2) return new Float32Array(0);
-    const halfWidth = lineWidth / 2;
-    const vertices = [];
-    const count = points.length;
-    const normals = [];
+  const kNumObjects = 100;
+  const objectInfos = [];
 
-    for (let i = 0; i < count - 1; i++) {
-      let dx = points[i + 1].x - points[i].x;
-      let dy = points[i + 1].y - points[i].y;
-      let len = Math.sqrt(dx * dx + dy * dy);
-      if (len === 0) len = 1;
-      normals.push({ x: -dy / len, y: dx / len });
+  // create 2 vertex buffers
+  const staticUnitSize =
+    4 + // color is 4 bytes
+    2 * 4; // offset is 2 32bit floats (4bytes each)
+  const changingUnitSize = 2 * 4; // scale is 2 32bit floats (4bytes each)
+  const staticVertexBufferSize = staticUnitSize * kNumObjects;
+  const changingVertexBufferSize = changingUnitSize * kNumObjects;
+
+  const staticVertexBuffer = device.createBuffer({
+    label: "static vertex for objects",
+    size: staticVertexBufferSize,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+
+  const changingVertexBuffer = device.createBuffer({
+    label: "changing storage for objects",
+    size: changingVertexBufferSize,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+
+  // offsets to the various uniform values in float32 indices
+  const kColorOffset = 0;
+  const kOffsetOffset = 1;
+
+  const kScaleOffset = 0;
+
+  {
+    const staticVertexValuesU8 = new Uint8Array(staticVertexBufferSize);
+    const staticVertexValuesF32 = new Float32Array(staticVertexValuesU8.buffer);
+    for (let i = 0; i < kNumObjects; ++i) {
+      const staticOffsetU8 = i * staticUnitSize;
+      const staticOffsetF32 = staticOffsetU8 / 4;
+
+      // These are only set once so set them now
+      staticVertexValuesU8.set(
+        // set the color
+        // [rand() * 255, rand() * 255, rand() * 255, 255],
+        // staticOffsetU8 + kColorOffset,
+        [i * 2, i * 2, i * 2, 255],
+        staticOffsetU8 + kColorOffset,
+      );
+
+      const x = ~~(i / 10) / 6 - 0.8;
+      const y = (i % 10) / 6 - 0.8;
+
+      staticVertexValuesF32.set(
+        // set the offset
+        // [rand(-0.9, 0.9), rand(-0.9, 0.9)],
+        // staticOffsetF32 + kOffsetOffset,
+        [x, y],
+        staticOffsetF32 + kOffsetOffset,
+      );
+
+      objectInfos.push({
+        scale: 0.1, //rand(0.2, 0.5),
+      });
     }
-
-    for (let i = 0; i < count; i++) {
-      let miterX, miterY;
-      let lengthScale = 1.0;
-
-      if (i === 0) {
-        miterX = normals[0].x;
-        miterY = normals[0].y;
-      } else if (i === count - 1) {
-        miterX = normals[count - 2].x;
-        miterY = normals[count - 2].y;
-      } else {
-        const n1 = normals[i - 1];
-        const n2 = normals[i];
-        miterX = n1.x + n2.x;
-        miterY = n1.y + n2.y;
-        let miterLen = Math.sqrt(miterX * miterX + miterY * miterY);
-        if (miterLen === 0) {
-          miterX = n1.x;
-          miterY = n1.y;
-        } else {
-          miterX /= miterLen;
-          miterY /= miterLen;
-          const dot = miterX * n1.x + miterY * n1.y;
-          if (dot !== 0) lengthScale = 1.0 / dot;
-        }
-        if (lengthScale > 3.0) lengthScale = 3.0;
-      }
-
-      const extX = miterX * halfWidth * lengthScale;
-      const extY = miterY * halfWidth * lengthScale;
-      vertices.push(points[i].x + extX, points[i].y + extY);
-      vertices.push(points[i].x - extX, points[i].y - extY);
-    }
-    return new Float32Array(vertices);
+    device.queue.writeBuffer(staticVertexBuffer, 0, staticVertexValuesF32);
   }
 
-  // ★ 修正：配列のインデックスを正しく指定して32バイトのデータを生成
-  function createUniformData(hexColor, ox, oy) {
-    const data = new Float32Array(8);
-    // Color (RGBA)
-    data[0] = parseInt(hexColor.slice(1, 3), 16) / 255;
-    data[1] = parseInt(hexColor.slice(3, 5), 16) / 255;
-    data[2] = parseInt(hexColor.slice(5, 7), 16) / 255;
-    data[3] = 1.0;
-    // Offset (X, Y)
-    data[4] = ox;
-    data[5] = oy;
-    // data[6], data[7] は自動的に 0.0 (パディング)
-    return data;
-  }
+  // a typed array we can use to update the changingStorageBuffer
+  const vertexValues = new Float32Array(changingVertexBufferSize / 4);
 
-  // 6. 描画処理メイン
+  const { vertexData, indexData, numVertices } = createCircleVertices({
+    radius: 0.5,
+    innerRadius: 0.25,
+  });
+  const vertexBuffer = device.createBuffer({
+    label: "vertex buffer",
+    size: vertexData.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+  const indexBuffer = device.createBuffer({
+    label: "index buffer",
+    size: indexData.byteLength,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(indexBuffer, 0, indexData);
+
+  const renderPassDescriptor = {
+    label: "our basic canvas renderPass",
+    colorAttachments: [
+      {
+        // view: <- to be filled out when we render
+        clearValue: [0.3, 0.3, 0.3, 1],
+        loadOp: "clear",
+        storeOp: "store",
+      },
+    ],
+  };
+
   render = () => {
-    const commandEncoder = device.createCommandEncoder();
-    const textureView = ctx.getCurrentTexture().createView();
-    const renderPassDescriptor = {
-      colorAttachments: [
-        {
-          view: textureView,
-          loadOp: "clear",
-          storeOp: "store",
-          clearValue: { r: 0.07, g: 0.07, b: 0.07, a: 1.0 },
-        },
-      ],
-    };
-    const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-    passEncoder.setPipeline(pipeline);
+    // Get the current texture from the canvas context and
+    // set it as the texture to render to.
+    renderPassDescriptor.colorAttachments[0].view = ctx
+      .getCurrentTexture()
+      .createView();
 
-    // ① 通常の線（太い枠線）の描画処理
-    if (linePoints.length >= 2) {
-      const lineVertexData = generateLineStripVertices(linePoints, lineWidth);
-      const lineIndices = [];
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass(renderPassDescriptor);
+    pass.setPipeline(pipeline);
+    pass.setVertexBuffer(0, vertexBuffer);
+    pass.setVertexBuffer(1, staticVertexBuffer);
+    pass.setVertexBuffer(2, changingVertexBuffer);
+    pass.setIndexBuffer(indexBuffer, "uint32");
 
-      // ★ 修正：トライアングルストリップから三角形リストへのインデックス展開ロジックを修正
-      for (let i = 0; i < linePoints.length - 1; i++) {
-        const topLeft = i * 2;
-        const bottomLeft = i * 2 + 1;
-        const topRight = (i + 1) * 2;
-        const bottomRight = (i + 1) * 2 + 1;
+    // Set the uniform values in our JavaScript side Float32Array
+    const aspect = canvas.width / canvas.height;
 
-        // 三角形1つ目
-        lineIndices.push(topLeft, bottomLeft, topRight);
-        // 三角形2つ目
-        lineIndices.push(bottomLeft, bottomRight, topRight);
-      }
-      const lineIndexData = new Uint16Array(lineIndices);
+    // set the scales for each object
+    objectInfos.forEach(({ scale }, ndx) => {
+      const offset = ndx * (changingUnitSize / 4);
+      vertexValues.set([scale / aspect, scale], offset + kScaleOffset); // set the scale
+    });
+    // upload all scales at once
+    device.queue.writeBuffer(changingVertexBuffer, 0, vertexValues);
 
-      const lineUniformData = createUniformData(lineColor, offsetX, offsetY);
-      const lineUniformBuffer = device.createBuffer({
-        size: 32,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(lineUniformBuffer, 0, lineUniformData);
+    pass.drawIndexed(numVertices, kNumObjects);
 
-      const lineBindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: lineUniformBuffer },
-          },
-        ],
-      });
+    pass.end();
 
-      const lineVertexBuffer = device.createBuffer({
-        size: lineVertexData.byteLength,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        mappedAtCreation: true,
-      });
-      new Float32Array(lineVertexBuffer.getMappedRange()).set(lineVertexData);
-      lineVertexBuffer.unmap();
-
-      const lineIndexBuffer = device.createBuffer({
-        size: Math.ceil(lineIndexData.byteLength / 4) * 4,
-        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-        mappedAtCreation: true,
-      });
-      new Uint16Array(lineIndexBuffer.getMappedRange()).set(lineIndexData);
-      lineIndexBuffer.unmap();
-
-      passEncoder.setVertexBuffer(0, lineVertexBuffer);
-      passEncoder.setIndexBuffer(lineIndexBuffer, "uint16");
-      passEncoder.setBindGroup(0, lineBindGroup);
-      passEncoder.drawIndexed(lineIndexData.length);
-    }
-
-    // ② 閉じたポリゴン（塗りつぶし）の描画処理
-    if (polyPoints.length >= 3) {
-      const polyVertices = [];
-      for (const p of polyPoints) {
-        polyVertices.push(p.x, p.y);
-      }
-      const polyVertexData = new Float32Array(polyVertices);
-
-      const polyIndices = [];
-      for (let i = 1; i < polyPoints.length - 1; i++) {
-        polyIndices.push(0, i, i + 1);
-      }
-      const polyIndexData = new Uint16Array(polyIndices);
-
-      const polyUniformData = createUniformData(polyColor, offsetX, offsetY);
-      const polyUniformBuffer = device.createBuffer({
-        size: 32,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(polyUniformBuffer, 0, polyUniformData);
-
-      const polyBindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: polyUniformBuffer },
-          },
-        ],
-      });
-
-      const polyVertexBuffer = device.createBuffer({
-        size: polyVertexData.byteLength,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        mappedAtCreation: true,
-      });
-      new Float32Array(polyVertexBuffer.getMappedRange()).set(polyVertexData);
-      polyVertexBuffer.unmap();
-
-      const polyIndexBuffer = device.createBuffer({
-        size: Math.ceil(polyIndexData.byteLength / 4) * 4,
-        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-        mappedAtCreation: true,
-      });
-      new Uint16Array(polyIndexBuffer.getMappedRange()).set(polyIndexData);
-      polyIndexBuffer.unmap();
-
-      passEncoder.setVertexBuffer(0, polyVertexBuffer);
-      passEncoder.setIndexBuffer(polyIndexBuffer, "uint16");
-      passEncoder.setBindGroup(0, polyBindGroup);
-      passEncoder.drawIndexed(polyIndexData.length);
-    }
-
-    passEncoder.end();
-    device.queue.submit([commandEncoder.finish()]);
+    const commandBuffer = encoder.finish();
+    device.queue.submit([commandBuffer]);
   };
 };
+
+// A random number between [min and max)
+// With 1 argument it will be [0 to min)
+// With no arguments it will be [0 to 1)
+const rand = (min, max) => {
+  if (min === undefined) {
+    min = 0;
+    max = 1;
+  } else if (max === undefined) {
+    max = min;
+    min = 0;
+  }
+  return min + Math.random() * (max - min);
+};
+
+function createCircleVertices({
+  radius = 1,
+  numSubdivisions = 24,
+  innerRadius = 0,
+  startAngle = 0,
+  endAngle = Math.PI * 2,
+} = {}) {
+  // 2 vertices at each subdivision, + 1 to wrap around the circle.
+  const numVertices = (numSubdivisions + 1) * 2;
+  // 2 32-bit values for position (xy) and 1 32-bit value for color (rgb)
+  // The 32-bit color value will be written/read as 4 8-bit values
+  const vertexData = new Float32Array(numVertices * (2 + 1));
+  const colorData = new Uint8Array(vertexData.buffer);
+
+  let offset = 0;
+  let colorOffset = 8;
+  const addVertex = (x, y, r, g, b) => {
+    vertexData[offset++] = x;
+    vertexData[offset++] = y;
+    offset += 1; // skip the color
+    colorData[colorOffset++] = r * 255;
+    colorData[colorOffset++] = g * 255;
+    colorData[colorOffset++] = b * 255;
+    colorOffset += 9; // skip extra byte and the position
+  };
+
+  const innerColor = [1, 1, 1];
+  // const outerColor = [0.1, 0.1, 0.1];
+  const outerColor = [1, 1, 1];
+
+  // 2 vertices per subdivision
+  //
+  // 1  3  5  7  9 ...
+  //
+  // 0  2  4  6  8 ...
+  for (let i = 0; i <= numSubdivisions; ++i) {
+    const angle =
+      startAngle + ((i + 0) * (endAngle - startAngle)) / numSubdivisions;
+
+    const c1 = Math.cos(angle);
+    const s1 = Math.sin(angle);
+
+    addVertex(c1 * radius, s1 * radius, ...outerColor);
+    addVertex(c1 * innerRadius, s1 * innerRadius, ...innerColor);
+  }
+
+  const indexData = new Uint32Array(numSubdivisions * 6);
+  let ndx = 0;
+
+  // 1st tri  2nd tri  3rd tri  4th tri
+  // 0 1 2    2 1 3    2 3 4    4 3 5
+  //
+  // 0--2        2     2--4        4  .....
+  // | /        /|     | /        /|
+  // |/        / |     |/        / |
+  // 1        1--3     3        3--5  .....
+  for (let i = 0; i < numSubdivisions; ++i) {
+    const ndxOffset = i * 2;
+
+    // first triangle
+    indexData[ndx++] = ndxOffset;
+    indexData[ndx++] = ndxOffset + 1;
+    indexData[ndx++] = ndxOffset + 2;
+
+    // second triangle
+    indexData[ndx++] = ndxOffset + 2;
+    indexData[ndx++] = ndxOffset + 1;
+    indexData[ndx++] = ndxOffset + 3;
+  }
+
+  return {
+    vertexData,
+    indexData,
+    numVertices: indexData.length,
+  };
+}
