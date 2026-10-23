@@ -15,10 +15,9 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-// ★ vec2f から vec2u (または vec2i) に変更
-@group(0) @binding(1) var<storage, read> all_vertices: array<u32>;
-@group(0) @binding(2) var<storage, read> all_indices: array<u32>;
-@group(0) @binding(3) var<storage, read> commands: array<DrawCommand>;
+@group(1) @binding(0) var<storage, read> commands: array<DrawCommand>;
+@group(1) @binding(1) var<storage, read> all_vertices: array<u32>;
+@group(1) @binding(2) var<storage, read> all_indices: array<u32>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,

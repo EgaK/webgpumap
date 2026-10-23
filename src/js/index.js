@@ -41,22 +41,79 @@ async function init() {
     // alphaMode: "premultiplied",
   });
 
-  // 3. データ生成の手前あたりにカメラ状態の変数を追加
-  // let zoom = 1.0;
-  // let cameraOffset = [0.0, 0.0];
+  // ==========================================
+  // 1. 各スロットの「設計図（レイアウト）」を定義する
+  // ==========================================
 
-  // ------------------------------------------
-  // 3. データ生成関数（ボタン押下時にここを再実行する）
-  // ------------------------------------------
+  // グループ0（画面共通Uniform用）の設計図
+  const commonBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
+      },
+    ],
+  });
 
-  // 初回のデータ生成を実行
-  const tileData = await generateSceneData();
-  const visibleTiles = [onCreateTile(device, tileData)];
+  // グループ1（タイル固有のcommandBuffer用）の設計図
+  const tileBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX, // 頂点シェーダーで使う場合
+        buffer: { type: "read-only-storage" }, // ストレージバッファ(読み込み専用)が入りますよという宣言
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+    ],
+  });
+
+  // ==========================================
+  // 2. 設計図を元に パイプライン を作成する
+  // ==========================================
+  const shaderModule = device.createShaderModule({ code: shaderCode });
+  const pipeline = device.createRenderPipeline({
+    // layout: "auto" の代わりに、2つの設計図を配列で渡す
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
+    }),
+    vertex: { module: shaderModule, entryPoint: "vs_main" },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_main",
+      targets: [{ format: presentationFormat }],
+    },
+    primitive: { topology: "triangle-list" },
+  });
 
   const uniformBuffer = device.createBuffer({
     size: 32,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
+
+  // ==========================================
+  // 3. 設計図（共通レイアウト）に、実際の一時バッファを紐付ける
+  // ==========================================
+  // 画面全体で1つだけ使い回す実体（BindGroup）
+  const globalBindGroup = device.createBindGroup({
+    layout: commonBindGroupLayout, // グループ0の設計図を指定
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } }, // 実体バッファ
+    ],
+  });
+
+  // 初回のデータ生成を実行
+  const tileData = await generateSceneData();
+  const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
 
   // ユニフォームバッファを更新する関数を作成
   function updateUniforms() {
@@ -79,47 +136,6 @@ async function init() {
 
   updateUniforms();
   updateUniforms2();
-  // ------------------------------------------
-  // 5. パイプライン & バインドグループ構築
-  // ------------------------------------------
-  const shaderModule = device.createShaderModule({ code: shaderCode });
-  const pipeline = device.createRenderPipeline({
-    layout: "auto",
-    vertex: { module: shaderModule, entryPoint: "vs_main" },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }],
-    },
-    primitive: { topology: "triangle-list" }, // すべて三角形として描画
-  });
-
-  const bindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: visibleTiles[0].vertexBuffer } },
-      { binding: 2, resource: { buffer: visibleTiles[0].indexBuffer } },
-      { binding: 3, resource: { buffer: visibleTiles[0].commandBuffer } },
-    ],
-  });
-
-  // ------------------------------------------
-  // 6. 描画発行 (レンダリング)
-  // ------------------------------------------
-  // 1つのインスタンス（図形）が扱いうる最大の頂点（インデックス）数を算出
-  // 折れ線の最大は (元の頂点数-1) * 6。ポリゴンは earcut のインデックス数。
-  // commandStructs.forEach((cmd) => {
-  //   let count = 0;
-  //   if (cmd.fig_type === 0) {
-  //     count = cmd.index_count;
-  //   } else if (cmd.fig_type === 1) {
-  //     count = (cmd.index_count - 1) * 6;
-  //   } else if (cmd.fig_type === 2) {
-  //     count = cmd.index_count * 3; // ★ 16角形なら 16 * 3 = 48 頂点に修正
-  //   }
-  //   if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
-  // });
 
   function render() {
     const commandEncoder = device.createCommandEncoder();
@@ -135,10 +151,11 @@ async function init() {
     });
 
     renderPass.setPipeline(pipeline);
-    renderPass.setBindGroup(0, bindGroup);
+    renderPass.setBindGroup(0, globalBindGroup);
 
     for (const tile of visibleTiles) {
       // ★単一のドローコールですべての線と面を一括描画！
+      renderPass.setBindGroup(1, tile.bindGroup);
       renderPass.draw(tile.maxVerticesPerInstance, tile.comLen, 0, 0);
     }
 

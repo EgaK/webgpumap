@@ -1,4 +1,4 @@
-export default function onCreateTile(device, tileData) {
+export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   // そのタイル固有のcommandBuffer（GPUバッファ）を作成・転送
   const commandBuffer = device.createBuffer({
     size: tileData.command.length * 48, // commandStructs は1要素48バイト
@@ -38,21 +38,21 @@ export default function onCreateTile(device, tileData) {
   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
   device.queue.writeBuffer(indexBuffer, 0, indexData);
 
-  // // そのタイル固有のBindGroup（グループ1の実体）を作成
-  // const bindGroup = device.createBindGroup({
-  //   layout: tileBindGroupLayout, // グループ1の設計図を指定
-  //   entries: [
-  //     { binding: 0, resource: { buffer: commandBuffer } }, // タイル個別のバッファを紐付け
-  //     { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
-  //     { binding: 2, resource: { buffer: indexBuffer } },
-  //   ],
-  // });
+  // そのタイル固有のBindGroup（グループ1の実体）を作成
+  const bindGroup = device.createBindGroup({
+    layout: tileBindGroupLayout, // グループ1の設計図を指定
+    entries: [
+      { binding: 0, resource: { buffer: commandBuffer } }, // タイル個別のバッファを紐付け
+      { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
+      { binding: 2, resource: { buffer: indexBuffer } },
+    ],
+  });
 
   return {
     commandBuffer,
     vertexBuffer,
     indexBuffer,
-    // bindGroup,
+    bindGroup,
     maxVerticesPerInstance: tileData.maxVerticesPerInstance,
     comLen: tileData.command.length,
   };
