@@ -5,9 +5,6 @@ struct DrawCommand {
     index_count: u32,   // 24〜27バイト
     fig_type: u32,      // 28〜31バイト　// 0: Polygon, 1: Polyline, 2: Round Join
     vertex_base: u32,   // 32〜35バイト
-    // パディングなくても自動で48バイトに切り上げされる
-    // _pad1: u32,          // 16バイトアライメント
-    // _pad2: u32,
 }
 
 struct Uniforms {
@@ -18,13 +15,10 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(1) @binding(0) var<storage, read> commands: array<DrawCommand>;
-@group(1) @binding(1) var<storage, read> all_vertices: array<u32>; // 👈 ここに引っ越し！
-@group(1) @binding(2) var<storage, read> all_indices: array<u32>; // 👈 ここに引っ越し！
 // ★ vec2f から vec2u (または vec2i) に変更
-// @group(0) @binding(1) var<storage, read> all_vertices: array<u32>;
-// @group(0) @binding(2) var<storage, read> all_indices: array<u32>;
-// @group(0) @binding(3) var<storage, read> commands: array<DrawCommand>;
+@group(0) @binding(1) var<storage, read> all_vertices: array<u32>;
+@group(0) @binding(2) var<storage, read> all_indices: array<u32>;
+@group(0) @binding(3) var<storage, read> commands: array<DrawCommand>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,

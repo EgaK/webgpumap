@@ -537,7 +537,7 @@ function signedArea(data, start, end, dim) {
 }
 
 // src/js/shader.wgsl
-var shader_default = `struct DrawCommand{color:vec4f,thickness:f32,index_base:u32,index_count:u32,fig_type:u32,vertex_base:u32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>commands:array<DrawCommand>;@group(1)@binding(1)var<storage,read>all_vertices:array<u32>;@group(1)@binding(2)var<storage,read>all_indices:array<u32>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let raw_x=packed&0xFFFFu;let raw_y=(packed>>16u)&0xFFFFu;let x=(i32(raw_x)<<16)>>16;let y=(i32(raw_y)<<16)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized=decoded_pos/4096.0;return normalized*2.0-1.0;}@vertex fn vs_main(@builtin(vertex_index)v_idx:u32,@builtin(instance_index)inst_idx:u32)->VertexOutput{var output:VertexOutput;let cmd=commands[inst_idx];output.color=cmd.color;if(cmd.fig_type==0u){if(v_idx>=cmd.index_count){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let global_idx=cmd.index_base+v_idx;let local_vert_idx=all_indices[global_idx];let raw_pos=all_vertices[cmd.vertex_base+local_vert_idx];let ndc_pos=raw_to_ndc(raw_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;output.position=vec4f(cam_pos,0.0,1.0);return output;}if(cmd.fig_type==1u){let segment_idx=v_idx/6u;let corner_idx=v_idx % 6u;if(segment_idx>=cmd.index_count-1u){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let p0=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx]);let p1=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx+1u]);let cam_p0=(p0-uniforms.u_offset)*uniforms.u_zoom;let cam_p1=(p1-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let dir=normalize(vec2f(cam_p1.x*aspect,cam_p1.y)-vec2f(cam_p0.x*aspect,cam_p0.y));let normal=vec2f(-dir.y,dir.x);let thickness_ndc=cmd.thickness/uniforms.u_res_y;let offset=vec2f((normal.x*thickness_ndc*0.5)/aspect,normal.y*thickness_ndc*0.5);var final_pos=vec2f(0.0);if(corner_idx==0u){final_pos=cam_p0+offset;}else if(corner_idx==1u||corner_idx==4u){final_pos=cam_p0-offset;}else if(corner_idx==2u||corner_idx==3u){final_pos=cam_p1+offset;}else if(corner_idx==5u){final_pos=cam_p1-offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}if(cmd.fig_type==2u){let total_circle_vertices=cmd.index_count*3u;if(v_idx>=total_circle_vertices){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let tri_idx=v_idx/3u;let sub_idx=v_idx % 3u;let center_pos=raw_to_ndc(all_vertices[cmd.vertex_base+cmd.index_base]);let cam_center=(center_pos-uniforms.u_offset)*uniforms.u_zoom;var final_pos=cam_center;if(sub_idx>0u){var vertex_on_ring=tri_idx;if(sub_idx==2u){vertex_on_ring=(tri_idx+1u)% cmd.index_count;}let angle=(f32(vertex_on_ring)/f32(cmd.index_count))*2.0*3.14159265;let raw_offset=vec2f(cos(angle),sin(angle));let aspect=uniforms.u_res_x/uniforms.u_res_y;let radius_ndc=(cmd.thickness*0.5)/uniforms.u_res_y;let offset=vec2f((raw_offset.x*radius_ndc)/aspect,raw_offset.y*radius_ndc);final_pos=cam_center+offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+var shader_default = `struct DrawCommand{color:vec4f,thickness:f32,index_base:u32,index_count:u32,fig_type:u32,vertex_base:u32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<storage,read>all_vertices:array<u32>;@group(0)@binding(2)var<storage,read>all_indices:array<u32>;@group(0)@binding(3)var<storage,read>commands:array<DrawCommand>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let raw_x=packed&0xFFFFu;let raw_y=(packed>>16u)&0xFFFFu;let x=(i32(raw_x)<<16)>>16;let y=(i32(raw_y)<<16)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized=decoded_pos/4096.0;return normalized*2.0-1.0;}@vertex fn vs_main(@builtin(vertex_index)v_idx:u32,@builtin(instance_index)inst_idx:u32)->VertexOutput{var output:VertexOutput;let cmd=commands[inst_idx];output.color=cmd.color;if(cmd.fig_type==0u){if(v_idx>=cmd.index_count){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let global_idx=cmd.index_base+v_idx;let local_vert_idx=all_indices[global_idx];let raw_pos=all_vertices[cmd.vertex_base+local_vert_idx];let ndc_pos=raw_to_ndc(raw_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;output.position=vec4f(cam_pos,0.0,1.0);return output;}if(cmd.fig_type==1u){let segment_idx=v_idx/6u;let corner_idx=v_idx % 6u;if(segment_idx>=cmd.index_count-1u){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let p0=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx]);let p1=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx+1u]);let cam_p0=(p0-uniforms.u_offset)*uniforms.u_zoom;let cam_p1=(p1-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let dir=normalize(vec2f(cam_p1.x*aspect,cam_p1.y)-vec2f(cam_p0.x*aspect,cam_p0.y));let normal=vec2f(-dir.y,dir.x);let thickness_ndc=cmd.thickness/uniforms.u_res_y;let offset=vec2f((normal.x*thickness_ndc*0.5)/aspect,normal.y*thickness_ndc*0.5);var final_pos=vec2f(0.0);if(corner_idx==0u){final_pos=cam_p0+offset;}else if(corner_idx==1u||corner_idx==4u){final_pos=cam_p0-offset;}else if(corner_idx==2u||corner_idx==3u){final_pos=cam_p1+offset;}else if(corner_idx==5u){final_pos=cam_p1-offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}if(cmd.fig_type==2u){let total_circle_vertices=cmd.index_count*3u;if(v_idx>=total_circle_vertices){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let tri_idx=v_idx/3u;let sub_idx=v_idx % 3u;let center_pos=raw_to_ndc(all_vertices[cmd.vertex_base+cmd.index_base]);let cam_center=(center_pos-uniforms.u_offset)*uniforms.u_zoom;var final_pos=cam_center;if(sub_idx>0u){var vertex_on_ring=tri_idx;if(sub_idx==2u){vertex_on_ring=(tri_idx+1u)% cmd.index_count;}let angle=(f32(vertex_on_ring)/f32(cmd.index_count))*2.0*3.14159265;let raw_offset=vec2f(cos(angle),sin(angle));let aspect=uniforms.u_res_x/uniforms.u_res_y;let radius_ndc=(cmd.thickness*0.5)/uniforms.u_res_y;let offset=vec2f((raw_offset.x*radius_ndc)/aspect,raw_offset.y*radius_ndc);final_pos=cam_center+offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
 
 // src/js/index.js
 var sab = new SharedArrayBuffer(12);
@@ -549,7 +549,6 @@ async function init() {
   const canvas = document.getElementById("a");
   const adapter = await navigator.gpu?.requestAdapter();
   const device = await adapter?.requestDevice();
-  const commandEncoder = device.createCommandEncoder();
   if (!device) {
     alert("WebGPU \u3092\u30B5\u30DD\u30FC\u30C8\u3057\u3066\u3044\u306A\u3044\u30D6\u30E9\u30A6\u30B6\u3001\u307E\u305F\u306F\u74B0\u5883\u3067\u3059\u3002");
     return;
@@ -566,86 +565,15 @@ async function init() {
   });
   let isDragging = false;
   let previousMousePosition = { x: 0, y: 0 };
-  const commonBindGroupLayout = device.createBindGroupLayout({
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform" }
-        // Uniformバッファが入りますよという宣言
-      }
-    ]
-  });
-  const tileBindGroupLayout = device.createBindGroupLayout({
-    entries: [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX,
-        // 頂点シェーダーで使う場合
-        buffer: { type: "read-only-storage" }
-        // ストレージバッファ(読み込み専用)が入りますよという宣言
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" }
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" }
-      }
-    ]
-  });
-  const shaderModule = device.createShaderModule({ code: shader_default });
-  const pipeline = device.createRenderPipeline({
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
-    }),
-    vertex: {
-      module: shaderModule,
-      entryPoint: "vs_main",
-      buffers: [
-        {
-          arrayStride: 4,
-          // ⭐ 1頂点あたり4バイト（u32が1個分）
-          attributes: [
-            {
-              shaderLocation: 0,
-              // WGSL側の @location(0) に対応
-              offset: 0,
-              format: "uint32"
-              // ⭐ パックされた1つのu32としてそのまま渡す
-            }
-          ]
-        }
-      ]
-    },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }]
-    },
-    primitive: { topology: "triangle-list" }
-  });
-  const uniformBuffer = device.createBuffer({
-    size: 32,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-  });
-  const globalBindGroup = device.createBindGroup({
-    layout: commonBindGroupLayout,
-    // グループ0の設計図を指定
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } }
-      // 実体バッファ
-    ]
-  });
+  let allVertices = [];
+  let allIndices = [];
+  let commandStructs = [];
+  let maxVerticesPerInstance = 0;
   async function generateSceneData() {
-    let allVertices = [];
-    let allIndices = [];
-    let commandStructs = [];
-    let maxVerticesPerInstance = 0;
+    allVertices = [];
+    allIndices = [];
+    commandStructs = [];
+    maxVerticesPerInstance = 0;
     let vertexBase = 0;
     let indexBase = 0;
     function addPolygon(rings, fillColor, strokeColor, strokeThickness) {
@@ -774,32 +702,35 @@ async function init() {
       else if (cmd.fig_type === 2) count = cmd.index_count * 3;
       if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
     });
-    return {
-      command: commandStructs,
-      vertex: allVertices,
-      index: allIndices,
-      maxVerticesPerInstance
-    };
   }
-  function onCreateTile(tileData) {
-    const commandBuffer = device.createBuffer({
-      size: tileData.command.length * 48,
-      // commandStructs は1要素48バイト
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-    });
-    const vertexBuffer = device.createBuffer({
-      size: tileData.vertex.length * 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-    });
-    const indexBuffer = device.createBuffer({
-      size: tileData.index.length * 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-    });
+  generateSceneData();
+  const uniformBuffer = device.createBuffer({
+    size: 32,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+  });
+  const vertexBufferSize = allVertices.length * 4;
+  const vertexBuffer = device.createBuffer({
+    size: vertexBufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+  });
+  const indexBufferSize = allIndices.length * 4;
+  const indexBuffer = device.createBuffer({
+    size: indexBufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+  });
+  const commandBufferSize = commandStructs.length * 48;
+  const commandBuffer = device.createBuffer({
+    size: commandBufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+  });
+  function uploadDataToGPU() {
+    const vertexData = new Uint32Array(allVertices);
+    const indexData = new Uint32Array(allIndices);
     const STRIDE = 48;
-    const commandBufferSize = tileData.command.length * STRIDE;
-    const commandArrayBuffer = new ArrayBuffer(commandBufferSize);
+    const commandBufferSize2 = commandStructs.length * STRIDE;
+    const commandArrayBuffer = new ArrayBuffer(commandBufferSize2);
     const commandView = new DataView(commandArrayBuffer);
-    tileData.command.forEach((cmd, i) => {
+    commandStructs.forEach((cmd, i) => {
       const offset = i * STRIDE;
       commandView.setFloat32(offset + 0, cmd.color[0], true);
       commandView.setFloat32(offset + 4, cmd.color[1], true);
@@ -811,33 +742,13 @@ async function init() {
       commandView.setUint32(offset + 28, cmd.fig_type, true);
       commandView.setUint32(offset + 32, cmd.vertex_base, true);
     });
-    device.queue.writeBuffer(commandBuffer, 0, commandArrayBuffer);
-    const vertexData = new Uint32Array(tileData.vertex);
-    const indexData = new Uint32Array(tileData.index);
     device.queue.writeBuffer(vertexBuffer, 0, vertexData);
     device.queue.writeBuffer(indexBuffer, 0, indexData);
-    const bindGroup = device.createBindGroup({
-      layout: tileBindGroupLayout,
-      // グループ1の設計図を指定
-      entries: [
-        { binding: 0, resource: { buffer: commandBuffer } },
-        // タイル個別のバッファを紐付け
-        { binding: 1, resource: { buffer: vertexBuffer } },
-        // ⭐ 頂点バッファをここに紐付ける
-        { binding: 2, resource: { buffer: indexBuffer } }
-      ]
-    });
-    return {
+    device.queue.writeBuffer(
       commandBuffer,
-      vertexBuffer,
-      indexBuffer,
-      bindGroup,
-      maxVerticesPerInstance: tileData.maxVerticesPerInstance
-    };
-  }
-  var tiledata = await generateSceneData();
-  var visibleTiles = [onCreateTile(tiledata)];
-  function uploadDataToGPU() {
+      0,
+      new Uint8Array(commandArrayBuffer)
+    );
   }
   function updateUniforms() {
     device.queue.writeBuffer(
@@ -859,8 +770,30 @@ async function init() {
     // 後半の12バイトの位置から書き込み
     new Float32Array([canvas.width, canvas.height])
   );
+  const shaderModule = device.createShaderModule({ code: shader_default });
+  const pipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: { module: shaderModule, entryPoint: "vs_main" },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_main",
+      targets: [{ format: presentationFormat }]
+    },
+    primitive: { topology: "triangle-list" }
+    // すべて三角形として描画
+  });
+  const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: { buffer: vertexBuffer } },
+      { binding: 2, resource: { buffer: indexBuffer } },
+      { binding: 3, resource: { buffer: commandBuffer } }
+    ]
+  });
   function render() {
-    const passEncoder = commandEncoder.beginRenderPass({
+    const commandEncoder = device.createCommandEncoder();
+    const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
         {
           view: context.getCurrentTexture().createView(),
@@ -870,13 +803,11 @@ async function init() {
         }
       ]
     });
-    passEncoder.setPipeline(pipeline);
-    passEncoder.setBindGroup(0, globalBindGroup);
-    for (const tile of visibleTiles) {
-      console.log(tile);
-      passEncoder.setBindGroup(1, tile.bindGroup);
-    }
-    passEncoder.end();
+    renderPass.setPipeline(pipeline);
+    renderPass.setBindGroup(0, bindGroup);
+    renderPass.draw(maxVerticesPerInstance, commandStructs.length, 0, 0);
+    renderPass.end();
+    device.queue.submit([commandEncoder.finish()]);
     fpsCounter.update();
   }
   render();
@@ -923,8 +854,8 @@ async function init() {
     if (!isDragging) return;
     const deltaX = e.clientX - previousMousePosition.x;
     const deltaY = e.clientY - previousMousePosition.y;
-    const ndcX = deltaX / canvas.width * 2 * (canvas.width / window.innerWidth);
-    const ndcY = -(deltaY / canvas.height) * 2 * (canvas.height / window.innerHeight);
+    const ndcX = deltaX / canvas.width * (canvas.width / window.innerWidth);
+    const ndcY = -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
     viewArray[0] -= ndcX / viewArray[2];
     viewArray[1] -= ndcY / viewArray[2];
     previousMousePosition = { x: e.clientX, y: e.clientY };
@@ -966,8 +897,8 @@ async function init() {
       if (e.touches.length === 1 && isDragging) {
         const deltaX = e.touches[0].clientX - previousMousePosition.x;
         const deltaY = e.touches[0].clientY - previousMousePosition.y;
-        const ndcX = deltaX / canvas.width * 2 * (canvas.width / window.innerWidth);
-        const ndcY = -(deltaY / canvas.height) * 2 * (canvas.height / window.innerHeight);
+        const ndcX = deltaX / canvas.width * (canvas.width / window.innerWidth);
+        const ndcY = -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
         viewArray[0] -= ndcX / viewArray[2];
         viewArray[1] -= ndcY / viewArray[2];
         previousMousePosition = {
