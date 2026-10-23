@@ -1,6 +1,6 @@
 import earcut from "./util/earcut.dev";
 
-export default async function generateSceneData(device) {
+export default async function generateSceneData() {
   // 配列をきれいにリセット
   let allVertices = [];
   let allIndices = [];
@@ -184,62 +184,10 @@ export default async function generateSceneData(device) {
     if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
   });
 
-  const vertexBufferSize = allVertices.length * 4; // Uint32Array は1要素4バイト
-
-  // ★ 各バッファに COPY_DST（データの書き込み許可）を追加
-  const vertexBuffer = device.createBuffer({
-    size: vertexBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  const indexBufferSize = allIndices.length * 4; // Uint32Array は1要素4バイト
-
-  const indexBuffer = device.createBuffer({
-    size: indexBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  const STRIDE = 48;
-  const commandBufferSize = commandStructs.length * STRIDE;
-
-  const commandBuffer = device.createBuffer({
-    size: commandBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  const vertexData = new Uint32Array(allVertices);
-  const indexData = new Uint32Array(allIndices);
-
-  const commandArrayBuffer = new ArrayBuffer(commandBufferSize);
-  const commandView = new DataView(commandArrayBuffer);
-
-  commandStructs.forEach((cmd, i) => {
-    const offset = i * STRIDE;
-    commandView.setFloat32(offset + 0, cmd.color[0], true);
-    commandView.setFloat32(offset + 4, cmd.color[1], true);
-    commandView.setFloat32(offset + 8, cmd.color[2], true);
-    commandView.setFloat32(offset + 12, cmd.color[3], true);
-    commandView.setFloat32(offset + 16, cmd.thickness, true);
-    commandView.setUint32(offset + 20, cmd.index_base, true);
-    commandView.setUint32(offset + 24, cmd.index_count, true);
-    commandView.setUint32(offset + 28, cmd.fig_type, true);
-    commandView.setUint32(offset + 32, cmd.vertex_base, true);
-  });
-
-  // writeBuffer を使って、すでにGPUにあるバッファの中身を上書き
-  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-  device.queue.writeBuffer(indexBuffer, 0, indexData);
-  device.queue.writeBuffer(
-    commandBuffer,
-    0,
-    new Uint8Array(commandArrayBuffer),
-  );
-
   return {
-    commandBuffer,
-    vertexBuffer,
-    indexBuffer,
+    command: commandStructs,
+    vertex: allVertices,
+    index: allIndices,
     maxVerticesPerInstance,
-    comLen: commandStructs.length,
   };
 }

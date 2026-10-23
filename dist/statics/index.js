@@ -661,7 +661,7 @@ function signedArea(data, start, end, dim) {
 }
 
 // src/js/generateSene.js
-async function generateSceneData(device) {
+async function generateSceneData() {
   let allVertices = [];
   let allIndices = [];
   let commandStructs = [];
@@ -794,27 +794,34 @@ async function generateSceneData(device) {
     else if (cmd.fig_type === 2) count = cmd.index_count * 3;
     if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
   });
-  const vertexBufferSize = allVertices.length * 4;
-  const vertexBuffer = device.createBuffer({
-    size: vertexBufferSize,
+  return {
+    command: commandStructs,
+    vertex: allVertices,
+    index: allIndices,
+    maxVerticesPerInstance
+  };
+}
+
+// src/js/onCreateTile.js
+function onCreateTile(device, tileData) {
+  const commandBuffer = device.createBuffer({
+    size: tileData.command.length * 48,
+    // commandStructs は1要素48バイト
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
   });
-  const indexBufferSize = allIndices.length * 4;
+  const vertexBuffer = device.createBuffer({
+    size: tileData.vertex.length * 4,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+  });
   const indexBuffer = device.createBuffer({
-    size: indexBufferSize,
+    size: tileData.index.length * 4,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
   });
   const STRIDE = 48;
-  const commandBufferSize = commandStructs.length * STRIDE;
-  const commandBuffer = device.createBuffer({
-    size: commandBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-  const vertexData = new Uint32Array(allVertices);
-  const indexData = new Uint32Array(allIndices);
+  const commandBufferSize = tileData.command.length * STRIDE;
   const commandArrayBuffer = new ArrayBuffer(commandBufferSize);
   const commandView = new DataView(commandArrayBuffer);
-  commandStructs.forEach((cmd, i) => {
+  tileData.command.forEach((cmd, i) => {
     const offset = i * STRIDE;
     commandView.setFloat32(offset + 0, cmd.color[0], true);
     commandView.setFloat32(offset + 4, cmd.color[1], true);
@@ -826,19 +833,18 @@ async function generateSceneData(device) {
     commandView.setUint32(offset + 28, cmd.fig_type, true);
     commandView.setUint32(offset + 32, cmd.vertex_base, true);
   });
+  device.queue.writeBuffer(commandBuffer, 0, commandArrayBuffer);
+  const vertexData = new Uint32Array(tileData.vertex);
+  const indexData = new Uint32Array(tileData.index);
   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
   device.queue.writeBuffer(indexBuffer, 0, indexData);
-  device.queue.writeBuffer(
-    commandBuffer,
-    0,
-    new Uint8Array(commandArrayBuffer)
-  );
   return {
     commandBuffer,
     vertexBuffer,
     indexBuffer,
-    maxVerticesPerInstance,
-    comLen: commandStructs.length
+    // bindGroup,
+    maxVerticesPerInstance: tileData.maxVerticesPerInstance,
+    comLen: tileData.command.length
   };
 }
 
@@ -866,7 +872,8 @@ async function init() {
     format: presentationFormat
     // alphaMode: "premultiplied",
   });
-  const tile = await generateSceneData(device);
+  const tileData = await generateSceneData();
+  const visibleTiles = [onCreateTile(device, tileData)];
   const uniformBuffer = device.createBuffer({
     size: 32,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
@@ -909,9 +916,9 @@ async function init() {
     layout: pipeline.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: tile.vertexBuffer } },
-      { binding: 2, resource: { buffer: tile.indexBuffer } },
-      { binding: 3, resource: { buffer: tile.commandBuffer } }
+      { binding: 1, resource: { buffer: visibleTiles[0].vertexBuffer } },
+      { binding: 2, resource: { buffer: visibleTiles[0].indexBuffer } },
+      { binding: 3, resource: { buffer: visibleTiles[0].commandBuffer } }
     ]
   });
   function render() {
@@ -928,10 +935,11 @@ async function init() {
     });
     renderPass.setPipeline(pipeline);
     renderPass.setBindGroup(0, bindGroup);
-    renderPass.draw(tile.maxVerticesPerInstance, tile.comLen, 0, 0);
+    for (const tile of visibleTiles) {
+      renderPass.draw(tile.maxVerticesPerInstance, tile.comLen, 0, 0);
+    }
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
-    fpsCounter.update();
   }
   render();
   mouseevents_default(

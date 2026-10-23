@@ -1,6 +1,8 @@
 import shaderCode from "./shader.wgsl";
 import mouseevents from "./util/mouseevents";
 import generateSceneData from "./generateSene";
+import onCreateTile from "./onCreateTile";
+
 const sab = new SharedArrayBuffer(12);
 const viewArray = new Float32Array(sab);
 
@@ -48,7 +50,8 @@ async function init() {
   // ------------------------------------------
 
   // 初回のデータ生成を実行
-  const tile = await generateSceneData(device);
+  const tileData = await generateSceneData();
+  const visibleTiles = [onCreateTile(device, tileData)];
 
   const uniformBuffer = device.createBuffer({
     size: 32,
@@ -95,9 +98,9 @@ async function init() {
     layout: pipeline.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: tile.vertexBuffer } },
-      { binding: 2, resource: { buffer: tile.indexBuffer } },
-      { binding: 3, resource: { buffer: tile.commandBuffer } },
+      { binding: 1, resource: { buffer: visibleTiles[0].vertexBuffer } },
+      { binding: 2, resource: { buffer: visibleTiles[0].indexBuffer } },
+      { binding: 3, resource: { buffer: visibleTiles[0].commandBuffer } },
     ],
   });
 
@@ -134,13 +137,13 @@ async function init() {
     renderPass.setPipeline(pipeline);
     renderPass.setBindGroup(0, bindGroup);
 
-    // ★単一のドローコールですべての線と面を一括描画！
-    renderPass.draw(tile.maxVerticesPerInstance, tile.comLen, 0, 0);
+    for (const tile of visibleTiles) {
+      // ★単一のドローコールですべての線と面を一括描画！
+      renderPass.draw(tile.maxVerticesPerInstance, tile.comLen, 0, 0);
+    }
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
-
-    fpsCounter.update();
   }
 
   render();
