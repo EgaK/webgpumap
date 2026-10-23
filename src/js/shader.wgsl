@@ -11,17 +11,20 @@ struct DrawCommand {
 }
 
 struct Uniforms {
-    u_resolution: vec2f,
-    u_zoom: f32,
-    u_coordinate_max: f32, // ★ 追加: JS側から「4096.0」を渡す（アライメント調整用パディング兼務）
-    u_offset: vec2f,
+    u_offset: vec2f,         // 8バイト (オフセット: 0)  <- viewArray[0], [1]
+    u_zoom: f32,             // 4バイト (オフセット: 8)  <- viewArray[2]
+    u_res_x: f32,            // 12 〜 16 バイト (canvas.width)
+    u_res_y: f32,            // 16 〜 20 バイト (canvas.height)
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+@group(1) @binding(0) var<storage, read> commands: array<DrawCommand>;
+@group(1) @binding(1) var<storage, read> all_vertices: array<u32>; // 👈 ここに引っ越し！
+@group(1) @binding(2) var<storage, read> all_indices: array<u32>; // 👈 ここに引っ越し！
 // ★ vec2f から vec2u (または vec2i) に変更
-@group(0) @binding(1) var<storage, read> all_vertices: array<u32>;
-@group(0) @binding(2) var<storage, read> all_indices: array<u32>;
-@group(0) @binding(3) var<storage, read> commands: array<DrawCommand>;
+// @group(0) @binding(1) var<storage, read> all_vertices: array<u32>;
+// @group(0) @binding(2) var<storage, read> all_indices: array<u32>;
+// @group(0) @binding(3) var<storage, read> commands: array<DrawCommand>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -49,7 +52,7 @@ fn raw_to_ndc(packed_val: u32) -> vec2f {
   let decoded_pos = unpack_sint16x2(packed_val);
 
   // 0〜4096基準の座標を -1.0〜1.0 に変換
-  let normalized = decoded_pos / uniforms.u_coordinate_max;
+  let normalized = decoded_pos / 4096.0;
   return normalized * 2.0 - 1.0;
 }
 
@@ -102,11 +105,11 @@ fn vs_main(
     let cam_p0 = (p0 - uniforms.u_offset) * uniforms.u_zoom;
     let cam_p1 = (p1 - uniforms.u_offset) * uniforms.u_zoom;
 
-    let aspect = uniforms.u_resolution.x / uniforms.u_resolution.y;
+    let aspect = uniforms.u_res_x / uniforms.u_res_y;
     let dir = normalize(vec2f(cam_p1.x * aspect, cam_p1.y) - vec2f(cam_p0.x * aspect, cam_p0.y));
     let normal = vec2f(-dir.y, dir.x);
 
-    let thickness_ndc = cmd.thickness / uniforms.u_resolution.y;
+    let thickness_ndc = cmd.thickness / uniforms.u_res_y;
     let offset = vec2f((normal.x * thickness_ndc * 0.5) / aspect, normal.y * thickness_ndc * 0.5);
 
     var final_pos = vec2f(0.0);
@@ -148,8 +151,8 @@ fn vs_main(
           let angle = (f32(vertex_on_ring) / f32(cmd.index_count)) * 2.0 * 3.14159265;
           let raw_offset = vec2f(cos(angle), sin(angle));
 
-          let aspect = uniforms.u_resolution.x / uniforms.u_resolution.y;
-          let radius_ndc = (cmd.thickness * 0.5) / uniforms.u_resolution.y;
+          let aspect = uniforms.u_res_x / uniforms.u_res_y;
+          let radius_ndc = (cmd.thickness * 0.5) / uniforms.u_res_y;
 
           let offset = vec2f((raw_offset.x * radius_ndc) / aspect, raw_offset.y * radius_ndc);
           final_pos = cam_center + offset;

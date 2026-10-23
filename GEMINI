@@ -1,3 +1,72 @@
+将来、複数のタイル（マルチタイル）に対応する際、システム全体をゼロから作り直すような大工事（フルスクラッチ）を避けるために、「今、1つのタイルを描画しているコード」の中で絶対にやっておくべき設計のポイントを3つに絞って解説します。
+これを意識してコードを組んでおけば、将来複数タイル化するときは「ループを回すだけ」で対応できるようになります。
+
+1. 【最重要】バッファは「タイルごと」に独立して作成する
+
+大量のデータを描画する際、「1つの巨大な頂点バッファ」にすべてのデータを詰め込む設計にしてしまうと、将来複数タイル化するときに破綻します。
+• ❌ やってはいけないこと: 画面全体の頂点バッファ（Vertex Buffer）を1つだけ用意し、そこに新しいタイルのデータを追加・削除していく設計。
+• ⭕ やるべき設計: 頂点バッファ（Vertex Buffer）とインデックスバッファ（Index Buffer）は、「1つのタイルオブジェクト」のプロパティ（所有物）として、タイルごとに新しく作成（createBuffer）する設計にしてください。
+将来複数タイルを描画するときは、この「バッファを持ったタイルオブジェクト」のインスタンスを配列（Map など）で管理し、以下のようにループで描画命令を投げるだけで済むようになります。
+javascript
+// 将来の複数タイル描画のイメージ（今からこの形を意識する）
+for (const tile of visibleTiles) {
+  // タイルごとの固有バッファをセットして描画
+  passEncoder.setVertexBuffer(0, tile.vertexBuffer);
+  passEncoder.setIndexBuffer(tile.indexBuffer, "uint32");
+  passEncoder.drawIndexed(tile.indexCount, 1, 0, 0, 0);
+}
+コードは注意してご使用ください。
+
+2. 「タイルの位置」は Uniform バッファ（または Push Constants）に切り離す
+
+頂点データ（星型や折れ線の座標）そのものに、「そのタイルが地球上のどこにあるか」というオフセット値を足し算して頂点バッファを作ってはいけません。
+• ❌ やってはいけないこと: JS側で vertex.x + tile_x のような計算をしてから頂点バッファに書き込む。
+• ⭕ やるべき設計: 頂点データは -1000〜5000 のローカル値をそのまま不変のデータとして頂点バッファに入れます。そして、そのタイルの位置（オフセット値）は、前述の通り Uniformバッファ（または別個のデータ転送） としてシェーダーに伝えます。
+これをしておくことで、まったく同じ星型のデータであっても、Uniformバッファの値を変えてループ描画するだけで、画面上の別々の場所に何個でもタイルをコピー（配置）できるようになります。
+
+3. タイルの「描画順」を制御できるようにインスタンス化しておく
+
+1つのタイルを描画している今は気になりませんが、複数タイルになると「どのタイルから順に描画するか」が非常に重要になります。特に地図アプリでは、背景（海・陸）➔ 道路 ➔ 建物 ➔ マーカー（文字）の順番で重ねて描画しないと、文字が道路の下に隠れてしまうといった表示バグが起きます。
+そのため、現在の1枚のタイルの描画ロジックの中に、「レイヤー（描画優先度）」の概念を混ぜておくことを強くおすすめします。
+• タイルの描画関数（またはコマンドエンコーダーへの登録処理）を独立したメソッド（例: tile.render(passEncoder)）にしておき、外側からコントロールできるようにしておきます。
+
+今すぐできるシンプルなクラス設計のイメージ
+
+将来の複数タイル化で書き直しをなくすための、JavaScript側の理想的なクラス設計のスケルトン（骨組み）です。今のうちから描画ロジックを以下のような構造に包んでおくと、後が劇的に楽になります。
+javascript
+class MapTile {
+  constructor(device, tileData) {
+    // 1. このタイル専用の頂点・インデックスバッファを作る
+    this.vertexBuffer = device.createBuffer({ ... });
+    this.indexBuffer = device.createBuffer({ ... });
+    this.indexCount = tileData.indices.length;
+
+    // 2. このタイル専用のUniformバッファ（相対位置などを格納）を作る
+    this.uniformBuffer = device.createBuffer({ size: 32, ... });
+  }
+
+  updateUniform(device, cameraX, cameraY, tileWorldX, tileWorldY) {
+    // ここで前述の「RTC（相対座標）」の引き算を行い、このタイルのUniformだけを更新する
+    const relativeX = tileWorldX - cameraX;
+    const relativeY = tileWorldY - cameraY;
+    // ... writeBuffer で転送
+  }
+
+  draw(passEncoder, bindGroup) {
+    // 3. このタイルを描画する命令（パイプラインや共通のBindGroupは外から受け取る）
+    passEncoder.setVertexBuffer(0, this.vertexBuffer);
+    passEncoder.setIndexBuffer(this.indexBuffer, "uint32");
+    // タイル個別のUniform（位置情報）をセット（※バインドグループの設計による）
+    // passEncoder.setBindGroup(1, this.tileBindGroup);
+    passEncoder.drawIndexed(this.indexCount);
+  }
+}
+コードは注意してご使用ください。
+今のデモデータをこの MapTile のような1つのオブジェクト（塊）として扱うようにコードを整理しておけば、1枚のデモ描画であっても複数枚の描画であっても、WebGPUのコアな描画ロジック（パイプラインの作成など）は1行も書き直す必要がなくなります。
+順を追って一歩ずつ実装を進めていけば大丈夫ですので、まずは今の1枚のタイルで美しい星型や折れ線が描画できるロジックをじっくり楽しんで完成させてください！
+
+
+
 // src/global.d.ts
 
 // グローバルスコープに変数を定義

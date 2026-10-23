@@ -1,8 +1,8 @@
 import earcut from "./util/earcut.dev";
 import shaderCode from "./shader.wgsl";
 
-const sab = new SharedArrayBuffer(24);
-const viewArray = new Float64Array(sab);
+const sab = new SharedArrayBuffer(12);
+const viewArray = new Float32Array(sab);
 
 // 初期値
 viewArray[0] = 0; // X
@@ -21,6 +21,7 @@ async function init() {
   const canvas = document.getElementById("a");
   const adapter = await navigator.gpu?.requestAdapter();
   const device = await adapter?.requestDevice();
+  const commandEncoder = device.createCommandEncoder();
 
   if (!device) {
     alert("WebGPU をサポートしていないブラウザ、または環境です。");
@@ -45,20 +46,105 @@ async function init() {
   let isDragging = false;
   let previousMousePosition = { x: 0, y: 0 };
 
+  // ==========================================
+  // 1. 各スロットの「設計図（レイアウト）」を定義する
+  // ==========================================
+
+  // グループ0（画面共通Uniform用）の設計図
+  const commonBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
+      },
+    ],
+  });
+
+  // グループ1（タイル固有のcommandBuffer用）の設計図
+  const tileBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX, // 頂点シェーダーで使う場合
+        buffer: { type: "read-only-storage" }, // ストレージバッファ(読み込み専用)が入りますよという宣言
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+    ],
+  });
+
+  // ==========================================
+  // 2. 設計図を元に パイプライン を作成する
+  // ==========================================
+  const shaderModule = device.createShaderModule({ code: shaderCode });
+  const pipeline = device.createRenderPipeline({
+    // layout: "auto" の代わりに、2つの設計図を配列で渡す
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
+    }),
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vs_main",
+      buffers: [
+        {
+          arrayStride: 4, // ⭐ 1頂点あたり4バイト（u32が1個分）
+          attributes: [
+            {
+              shaderLocation: 0, // WGSL側の @location(0) に対応
+              offset: 0,
+              format: "uint32", // ⭐ パックされた1つのu32としてそのまま渡す
+            },
+          ],
+        },
+      ],
+    },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_main",
+      targets: [{ format: presentationFormat }],
+    },
+    primitive: { topology: "triangle-list" },
+  });
+
+  const uniformBuffer = device.createBuffer({
+    size: 32,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  // ==========================================
+  // 3. 設計図（共通レイアウト）に、実際の一時バッファを紐付ける
+  // ==========================================
+  // 画面全体で1つだけ使い回す実体（BindGroup）
+  const globalBindGroup = device.createBindGroup({
+    layout: commonBindGroupLayout, // グループ0の設計図を指定
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } }, // 実体バッファ
+    ],
+  });
+
   // ------------------------------------------
   // 3. データ生成関数（ボタン押下時にここを再実行する）
   // ------------------------------------------
-  let allVertices = [];
-  let allIndices = [];
-  let commandStructs = [];
-  let maxVerticesPerInstance = 0;
+  // let allVertices = [];
+  // let allIndices = [];
+  // let commandStructs = [];
+  // let maxVerticesPerInstance = 0;
 
   async function generateSceneData() {
     // 配列をきれいにリセット
-    allVertices = [];
-    allIndices = [];
-    commandStructs = [];
-    maxVerticesPerInstance = 0;
+    let allVertices = [];
+    let allIndices = [];
+    let commandStructs = [];
+    let maxVerticesPerInstance = 0;
 
     let vertexBase = 0;
     let indexBase = 0;
@@ -236,57 +322,37 @@ async function init() {
       else if (cmd.fig_type === 2) count = cmd.index_count * 3;
       if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
     });
+
+    return {
+      command: commandStructs,
+      vertex: allVertices,
+      index: allIndices,
+      maxVerticesPerInstance,
+    };
   }
 
-  // 初回のデータ生成を実行
-  generateSceneData();
-
-  // ------------------------------------------
-  // 4. GPUバッファの作成（最大サイズで固定確保）
-  // ------------------------------------------
-  // デモが扱いうる最大のバイトサイズをあらかじめ確保 (1万個の図形が余裕で入るサイズ)
-  // const MAX_VERTEX_BYTES = 1024 * 1024 * 32; // 32MB
-  // const MAX_INDEX_BYTES = 1024 * 1024 * 16; // 16MB
-  // const MAX_COMMAND_BYTES = 100000 * 48; // 10万コマンド分
-
-  const uniformBuffer = device.createBuffer({
-    size: 32,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
-
-  const vertexBufferSize = allVertices.length * 4; // Uint32Array は1要素4バイト
-
-  // ★ 各バッファに COPY_DST（データの書き込み許可）を追加
-  const vertexBuffer = device.createBuffer({
-    size: vertexBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  const indexBufferSize = allIndices.length * 4; // Uint32Array は1要素4バイト
-
-  const indexBuffer = device.createBuffer({
-    size: indexBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  const commandBufferSize = commandStructs.length * 48; // commandStructs は1要素48バイト
-
-  const commandBuffer = device.createBuffer({
-    size: commandBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  // 生成された配列データをGPUバッファに転送する関数
-  function uploadDataToGPU() {
-    const vertexData = new Uint32Array(allVertices);
-    const indexData = new Uint32Array(allIndices);
+  // タイルデータが読み込まれた時に実行されるイメージ
+  function onCreateTile(tileData) {
+    // そのタイル固有のcommandBuffer（GPUバッファ）を作成・転送
+    const commandBuffer = device.createBuffer({
+      size: tileData.command.length * 48, // commandStructs は1要素48バイト
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const vertexBuffer = device.createBuffer({
+      size: tileData.vertex.length * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const indexBuffer = device.createBuffer({
+      size: tileData.index.length * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
 
     const STRIDE = 48;
-    const commandBufferSize = commandStructs.length * STRIDE;
+    const commandBufferSize = tileData.command.length * STRIDE;
     const commandArrayBuffer = new ArrayBuffer(commandBufferSize);
     const commandView = new DataView(commandArrayBuffer);
 
-    commandStructs.forEach((cmd, i) => {
+    tileData.command.forEach((cmd, i) => {
       const offset = i * STRIDE;
       commandView.setFloat32(offset + 0, cmd.color[0], true);
       commandView.setFloat32(offset + 4, cmd.color[1], true);
@@ -298,79 +364,114 @@ async function init() {
       commandView.setUint32(offset + 28, cmd.fig_type, true);
       commandView.setUint32(offset + 32, cmd.vertex_base, true);
     });
+    device.queue.writeBuffer(commandBuffer, 0, commandArrayBuffer);
 
-    // writeBuffer を使って、すでにGPUにあるバッファの中身を上書き
+    const vertexData = new Uint32Array(tileData.vertex);
+    const indexData = new Uint32Array(tileData.index);
+
     device.queue.writeBuffer(vertexBuffer, 0, vertexData);
     device.queue.writeBuffer(indexBuffer, 0, indexData);
-    device.queue.writeBuffer(
+
+    // そのタイル固有のBindGroup（グループ1の実体）を作成
+    const bindGroup = device.createBindGroup({
+      layout: tileBindGroupLayout, // グループ1の設計図を指定
+      entries: [
+        { binding: 0, resource: { buffer: commandBuffer } }, // タイル個別のバッファを紐付け
+        { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
+        { binding: 2, resource: { buffer: indexBuffer } },
+      ],
+    });
+
+    return {
       commandBuffer,
-      0,
-      new Uint8Array(commandArrayBuffer),
-    );
+      vertexBuffer,
+      indexBuffer,
+      bindGroup,
+      maxVerticesPerInstance: tileData.maxVerticesPerInstance,
+    };
+  }
+
+  // 初回のデータ生成を実行
+  var tiledata = await generateSceneData();
+  var visibleTiles = [onCreateTile(tiledata)];
+
+  // 生成された配列データをGPUバッファに転送する関数
+  function uploadDataToGPU() {
+    //     const vertexData = new Uint32Array(allVertices);
+    //     const indexData = new Uint32Array(allIndices);
+    //
+    //     const STRIDE = 48;
+    //     const commandBufferSize = commandStructs.length * STRIDE;
+    //     const commandArrayBuffer = new ArrayBuffer(commandBufferSize);
+    //     const commandView = new DataView(commandArrayBuffer);
+    //
+    //     commandStructs.forEach((cmd, i) => {
+    //       const offset = i * STRIDE;
+    //       commandView.setFloat32(offset + 0, cmd.color[0], true);
+    //       commandView.setFloat32(offset + 4, cmd.color[1], true);
+    //       commandView.setFloat32(offset + 8, cmd.color[2], true);
+    //       commandView.setFloat32(offset + 12, cmd.color[3], true);
+    //       commandView.setFloat32(offset + 16, cmd.thickness, true);
+    //       commandView.setUint32(offset + 20, cmd.index_base, true);
+    //       commandView.setUint32(offset + 24, cmd.index_count, true);
+    //       commandView.setUint32(offset + 28, cmd.fig_type, true);
+    //       commandView.setUint32(offset + 32, cmd.vertex_base, true);
+    //     });
+    //
+    //     // writeBuffer を使って、すでにGPUにあるバッファの中身を上書き
+    //     device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+    //     device.queue.writeBuffer(indexBuffer, 0, indexData);
+    //     device.queue.writeBuffer(
+    //       commandBuffer,
+    //       0,
+    //       new Uint8Array(commandArrayBuffer),
+    //     );
   }
 
   // ユニフォームバッファを更新する関数を作成
   function updateUniforms() {
-    const uniformData = new Float32Array([
-      canvas.width,
-      canvas.height, // u_resolution
-      viewArray[2],
-      4096.0, // u_coordinate_max, pad兼用
-      viewArray[0],
-      viewArray[1], // u_offset
-    ]);
-    device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+    // 1. offsetとzoom（12バイト分）を、GPUバッファの先頭（オフセット0）に直接転送
+    device.queue.writeBuffer(
+      uniformBuffer,
+      0,
+      viewArray.buffer, // ArrayBufferを直接指定
+      viewArray.byteOffset, // 開始位置
+      12, // 12バイト分 (f32 x 3要素分)
+    );
   }
 
   // 初回データをGPUにアップロード
   uploadDataToGPU();
   updateUniforms();
+  device.queue.writeBuffer(
+    uniformBuffer,
+    12, // 後半の12バイトの位置から書き込み
+    new Float32Array([canvas.width, canvas.height]),
+  );
 
   // ------------------------------------------
   // 5. パイプライン & バインドグループ構築
   // ------------------------------------------
-  const shaderModule = device.createShaderModule({ code: shaderCode });
-  const pipeline = device.createRenderPipeline({
-    layout: "auto",
-    vertex: { module: shaderModule, entryPoint: "vs_main" },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }],
-    },
-    primitive: { topology: "triangle-list" }, // すべて三角形として描画
-  });
-
-  const bindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: vertexBuffer } },
-      { binding: 2, resource: { buffer: indexBuffer } },
-      { binding: 3, resource: { buffer: commandBuffer } },
-    ],
-  });
 
   // ------------------------------------------
   // 6. 描画発行 (レンダリング)
   // ------------------------------------------
   // 1つのインスタンス（図形）が扱いうる最大の頂点（インデックス）数を算出
   // 折れ線の最大は (元の頂点数-1) * 6。ポリゴンは earcut のインデックス数。
-  commandStructs.forEach((cmd) => {
-    let count = 0;
-    if (cmd.fig_type === 0) {
-      count = cmd.index_count;
-    } else if (cmd.fig_type === 1) {
-      count = (cmd.index_count - 1) * 6;
-    } else if (cmd.fig_type === 2) {
-      count = cmd.index_count * 3; // ★ 16角形なら 16 * 3 = 48 頂点に修正
-    }
-    if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
-  });
+  // commandStructs.forEach((cmd) => {
+  //   let count = 0;
+  //   if (cmd.fig_type === 0) {
+  //     count = cmd.index_count;
+  //   } else if (cmd.fig_type === 1) {
+  //     count = (cmd.index_count - 1) * 6;
+  //   } else if (cmd.fig_type === 2) {
+  //     count = cmd.index_count * 3; // ★ 16角形なら 16 * 3 = 48 頂点に修正
+  //   }
+  //   if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
+  // });
 
   function render() {
-    const commandEncoder = device.createCommandEncoder();
-    const renderPass = commandEncoder.beginRenderPass({
+    const passEncoder = commandEncoder.beginRenderPass({
       colorAttachments: [
         {
           view: context.getCurrentTexture().createView(),
@@ -381,14 +482,26 @@ async function init() {
       ],
     });
 
-    renderPass.setPipeline(pipeline);
-    renderPass.setBindGroup(0, bindGroup);
+    passEncoder.setPipeline(pipeline);
 
-    // ★単一のドローコールですべての線と面を一括描画！
-    renderPass.draw(maxVerticesPerInstance, commandStructs.length, 0, 0);
+    // 共通 Uniform（グループ0）をセット
+    passEncoder.setBindGroup(0, globalBindGroup);
 
-    renderPass.end();
-    device.queue.submit([commandEncoder.finish()]);
+    // タイルの配列をループで回す（デモなら1回だけのループでも可）
+    for (const tile of visibleTiles) {
+      console.log(tile);
+      // ① 頂点バッファを直接セット！
+      // passEncoder.setVertexBuffer(0, tile.vertexBuffer);
+
+      // ② インデックスバッファを直接セット！
+      // passEncoder.setIndexBuffer(tile.indexBuffer, "uint32");
+
+      // ③ コマンドバッファが入った「タイル固有のバインドグループ（グループ1）」をセット！
+      passEncoder.setBindGroup(1, tile.bindGroup);
+    }
+
+    passEncoder.end();
+    // device.queue.submit([commandEncoder.finish()]);
 
     fpsCounter.update();
   }
@@ -401,7 +514,7 @@ async function init() {
     canvas.height = window.innerHeight * devicePixelRatio;
     device.queue.writeBuffer(
       uniformBuffer,
-      0,
+      12, // 後半の12バイトの位置から書き込み
       new Float32Array([canvas.width, canvas.height]),
     );
     render();
