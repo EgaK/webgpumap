@@ -1,9 +1,5 @@
 const fs = require("fs");
 const { execFile, exec } = require("child_process");
-// const compilerPackage = require("google-closure-compiler");
-// // const ClosureCompiler = compilerPackage.compiler;
-// const ClosureCompiler =
-//   "/opt/homebrew/Cellar/closure-compiler/20261020/bin/closure-compiler";
 const esbuild = require("esbuild");
 const { glsl } = require("esbuild-plugin-glsl");
 const htmlMinifier = require("html-minifier").minify;

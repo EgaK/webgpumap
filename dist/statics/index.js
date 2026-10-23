@@ -1,3 +1,127 @@
+// src/js/shader.wgsl
+var shader_default = `struct DrawCommand{color:vec4f,thickness:f32,index_base:u32,index_count:u32,fig_type:u32,vertex_base:u32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<storage,read>all_vertices:array<u32>;@group(0)@binding(2)var<storage,read>all_indices:array<u32>;@group(0)@binding(3)var<storage,read>commands:array<DrawCommand>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let raw_x=packed&0xFFFFu;let raw_y=(packed>>16u)&0xFFFFu;let x=(i32(raw_x)<<16)>>16;let y=(i32(raw_y)<<16)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized=decoded_pos/4096.0;return normalized*2.0-1.0;}@vertex fn vs_main(@builtin(vertex_index)v_idx:u32,@builtin(instance_index)inst_idx:u32)->VertexOutput{var output:VertexOutput;let cmd=commands[inst_idx];output.color=cmd.color;if(cmd.fig_type==0u){if(v_idx>=cmd.index_count){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let global_idx=cmd.index_base+v_idx;let local_vert_idx=all_indices[global_idx];let raw_pos=all_vertices[cmd.vertex_base+local_vert_idx];let ndc_pos=raw_to_ndc(raw_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;output.position=vec4f(cam_pos,0.0,1.0);return output;}if(cmd.fig_type==1u){let segment_idx=v_idx/6u;let corner_idx=v_idx % 6u;if(segment_idx>=cmd.index_count-1u){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let p0=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx]);let p1=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx+1u]);let cam_p0=(p0-uniforms.u_offset)*uniforms.u_zoom;let cam_p1=(p1-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let dir=normalize(vec2f(cam_p1.x*aspect,cam_p1.y)-vec2f(cam_p0.x*aspect,cam_p0.y));let normal=vec2f(-dir.y,dir.x);let thickness_ndc=cmd.thickness/uniforms.u_res_y;let offset=vec2f((normal.x*thickness_ndc*0.5)/aspect,normal.y*thickness_ndc*0.5);var final_pos=vec2f(0.0);if(corner_idx==0u){final_pos=cam_p0+offset;}else if(corner_idx==1u||corner_idx==4u){final_pos=cam_p0-offset;}else if(corner_idx==2u||corner_idx==3u){final_pos=cam_p1+offset;}else if(corner_idx==5u){final_pos=cam_p1-offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}if(cmd.fig_type==2u){let total_circle_vertices=cmd.index_count*3u;if(v_idx>=total_circle_vertices){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let tri_idx=v_idx/3u;let sub_idx=v_idx % 3u;let center_pos=raw_to_ndc(all_vertices[cmd.vertex_base+cmd.index_base]);let cam_center=(center_pos-uniforms.u_offset)*uniforms.u_zoom;var final_pos=cam_center;if(sub_idx>0u){var vertex_on_ring=tri_idx;if(sub_idx==2u){vertex_on_ring=(tri_idx+1u)% cmd.index_count;}let angle=(f32(vertex_on_ring)/f32(cmd.index_count))*2.0*3.14159265;let raw_offset=vec2f(cos(angle),sin(angle));let aspect=uniforms.u_res_x/uniforms.u_res_y;let radius_ndc=(cmd.thickness*0.5)/uniforms.u_res_y;let offset=vec2f((raw_offset.x*radius_ndc)/aspect,raw_offset.y*radius_ndc);final_pos=cam_center+offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+
+// src/js/util/mouseevents.js
+var isDragging = false;
+var previousMousePosition = { x: 0, y: 0 };
+var mouseevents_default = (viewArray2, render, updateUniforms, updateUniforms2, generateSceneData2) => {
+  const canvas = document.getElementById("a");
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+    updateUniforms2();
+    render();
+  });
+  canvas.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left) / rect.width * 2 - 1;
+      const mouseY = -((e.clientY - rect.top) / rect.height * 2 - 1);
+      const zoomFactor = 1.1;
+      const oldZoom = viewArray2[2];
+      if (e.deltaY < 0) {
+        viewArray2[2] *= zoomFactor;
+      } else {
+        viewArray2[2] /= zoomFactor;
+      }
+      viewArray2[2] = Math.max(0.1, Math.min(viewArray2[2], 100));
+      viewArray2[0] += mouseX / oldZoom - mouseX / viewArray2[2];
+      viewArray2[1] += mouseY / oldZoom - mouseY / viewArray2[2];
+      updateUniforms();
+      render();
+    },
+    { passive: false }
+  );
+  canvas.addEventListener("mousedown", (e) => {
+    if (e.button === 0) {
+      isDragging = true;
+      previousMousePosition = { x: e.clientX, y: e.clientY };
+    }
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - previousMousePosition.x;
+    const deltaY = e.clientY - previousMousePosition.y;
+    const ndcX = deltaX / canvas.width * (canvas.width / window.innerWidth);
+    const ndcY = -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
+    viewArray2[0] -= ndcX / viewArray2[2];
+    viewArray2[1] -= ndcY / viewArray2[2];
+    previousMousePosition = { x: e.clientX, y: e.clientY };
+    updateUniforms();
+    render();
+  });
+  window.addEventListener("mouseup", () => {
+    isDragging = false;
+  });
+  let initialTouchDistance = 0;
+  let initialZoom = 1;
+  function getTouchDistance(touch1, touch2) {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  canvas.addEventListener(
+    "touchstart",
+    (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        isDragging = true;
+        previousMousePosition = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY
+        };
+      } else if (e.touches.length === 2) {
+        isDragging = false;
+        initialTouchDistance = getTouchDistance(e.touches[0], e.touches[1]);
+        initialZoom = viewArray2[2];
+      }
+    },
+    { passive: false }
+  );
+  canvas.addEventListener(
+    "touchmove",
+    (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && isDragging) {
+        const deltaX = e.touches[0].clientX - previousMousePosition.x;
+        const deltaY = e.touches[0].clientY - previousMousePosition.y;
+        const ndcX = deltaX / canvas.width * (canvas.width / window.innerWidth);
+        const ndcY = -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
+        viewArray2[0] -= ndcX / viewArray2[2];
+        viewArray2[1] -= ndcY / viewArray2[2];
+        previousMousePosition = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY
+        };
+        updateUniforms();
+        render();
+      } else if (e.touches.length === 2) {
+        const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
+        if (initialTouchDistance > 0) {
+          const factor = currentDistance / initialTouchDistance;
+          viewArray2[2] = initialZoom * factor;
+          viewArray2[2] = Math.max(0.1, Math.min(viewArray2[2], 100));
+          updateUniforms();
+          render();
+        }
+      }
+    },
+    { passive: false }
+  );
+  canvas.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    isDragging = false;
+    initialTouchDistance = 0;
+  });
+  document.getElementById("regenButton").addEventListener("click", () => {
+    generateSceneData2();
+    render();
+  });
+};
+
 // src/js/util/earcut.dev.js
 var steiners = /* @__PURE__ */ new Set();
 var filteredOut = false;
@@ -536,8 +660,187 @@ function signedArea(data, start, end, dim) {
   return sum;
 }
 
-// src/js/shader.wgsl
-var shader_default = `struct DrawCommand{color:vec4f,thickness:f32,index_base:u32,index_count:u32,fig_type:u32,vertex_base:u32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<storage,read>all_vertices:array<u32>;@group(0)@binding(2)var<storage,read>all_indices:array<u32>;@group(0)@binding(3)var<storage,read>commands:array<DrawCommand>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let raw_x=packed&0xFFFFu;let raw_y=(packed>>16u)&0xFFFFu;let x=(i32(raw_x)<<16)>>16;let y=(i32(raw_y)<<16)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized=decoded_pos/4096.0;return normalized*2.0-1.0;}@vertex fn vs_main(@builtin(vertex_index)v_idx:u32,@builtin(instance_index)inst_idx:u32)->VertexOutput{var output:VertexOutput;let cmd=commands[inst_idx];output.color=cmd.color;if(cmd.fig_type==0u){if(v_idx>=cmd.index_count){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let global_idx=cmd.index_base+v_idx;let local_vert_idx=all_indices[global_idx];let raw_pos=all_vertices[cmd.vertex_base+local_vert_idx];let ndc_pos=raw_to_ndc(raw_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;output.position=vec4f(cam_pos,0.0,1.0);return output;}if(cmd.fig_type==1u){let segment_idx=v_idx/6u;let corner_idx=v_idx % 6u;if(segment_idx>=cmd.index_count-1u){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let p0=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx]);let p1=raw_to_ndc(all_vertices[cmd.vertex_base+segment_idx+1u]);let cam_p0=(p0-uniforms.u_offset)*uniforms.u_zoom;let cam_p1=(p1-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let dir=normalize(vec2f(cam_p1.x*aspect,cam_p1.y)-vec2f(cam_p0.x*aspect,cam_p0.y));let normal=vec2f(-dir.y,dir.x);let thickness_ndc=cmd.thickness/uniforms.u_res_y;let offset=vec2f((normal.x*thickness_ndc*0.5)/aspect,normal.y*thickness_ndc*0.5);var final_pos=vec2f(0.0);if(corner_idx==0u){final_pos=cam_p0+offset;}else if(corner_idx==1u||corner_idx==4u){final_pos=cam_p0-offset;}else if(corner_idx==2u||corner_idx==3u){final_pos=cam_p1+offset;}else if(corner_idx==5u){final_pos=cam_p1-offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}if(cmd.fig_type==2u){let total_circle_vertices=cmd.index_count*3u;if(v_idx>=total_circle_vertices){output.position=vec4f(0.0,0.0,0.0,0.0);return output;}let tri_idx=v_idx/3u;let sub_idx=v_idx % 3u;let center_pos=raw_to_ndc(all_vertices[cmd.vertex_base+cmd.index_base]);let cam_center=(center_pos-uniforms.u_offset)*uniforms.u_zoom;var final_pos=cam_center;if(sub_idx>0u){var vertex_on_ring=tri_idx;if(sub_idx==2u){vertex_on_ring=(tri_idx+1u)% cmd.index_count;}let angle=(f32(vertex_on_ring)/f32(cmd.index_count))*2.0*3.14159265;let raw_offset=vec2f(cos(angle),sin(angle));let aspect=uniforms.u_res_x/uniforms.u_res_y;let radius_ndc=(cmd.thickness*0.5)/uniforms.u_res_y;let offset=vec2f((raw_offset.x*radius_ndc)/aspect,raw_offset.y*radius_ndc);final_pos=cam_center+offset;}output.position=vec4f(final_pos,0.0,1.0);return output;}return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+// src/js/generateSene.js
+async function generateSceneData(device) {
+  let allVertices = [];
+  let allIndices = [];
+  let commandStructs = [];
+  let maxVerticesPerInstance = 0;
+  let vertexBase = 0;
+  let indexBase = 0;
+  function addPolygon(rings, fillColor, strokeColor, strokeThickness) {
+    const earcutRawData = [];
+    const flatData = [];
+    const holeIndices = [];
+    let currentVertexCount = 0;
+    for (let i = 0; i < rings.length; i++) {
+      const ring = rings[i];
+      if (ring.length === 0) continue;
+      if (i > 0) {
+        holeIndices.push(currentVertexCount);
+      }
+      for (const p of ring) {
+        earcutRawData.push(p[0], p[1]);
+        const combined = (p[1] & 65535) << 16 | p[0] & 65535;
+        flatData.push(combined);
+        currentVertexCount++;
+      }
+    }
+    const indices = earcut(earcutRawData, holeIndices);
+    if (indices.length === 0) return;
+    const vertexCount = flatData.length;
+    allVertices.push(...flatData);
+    allIndices.push(...indices);
+    commandStructs.push({
+      color: fillColor,
+      thickness: 0,
+      index_base: indexBase,
+      index_count: indices.length,
+      fig_type: 0,
+      vertex_base: vertexBase
+    });
+    vertexBase += vertexCount;
+    indexBase += indices.length;
+    for (const ring of rings) {
+      if (ring.length > 0) {
+        const strokePoints = [...ring, ring[0]];
+        addPolyline(strokePoints, strokeColor, strokeThickness);
+      }
+    }
+  }
+  function addPolyline(points, color, thickness) {
+    for (const p of points) {
+      const combined = (p[1] & 65535) << 16 | p[0] & 65535;
+      allVertices.push(combined);
+    }
+    commandStructs.push({
+      color,
+      thickness,
+      index_base: 0,
+      index_count: points.length,
+      fig_type: 1,
+      vertex_base: vertexBase
+    });
+    for (let i = 0; i < points.length; i++) {
+      commandStructs.push({
+        color,
+        thickness,
+        index_base: i,
+        index_count: 32,
+        // 分割数32で固定
+        fig_type: 2,
+        vertex_base: vertexBase
+      });
+    }
+    vertexBase += points.length;
+  }
+  const NUM_POLYGONS = 5e3;
+  const NUM_LINES = 5e3;
+  for (let i = 0; i < NUM_POLYGONS; i++) {
+    const cx = Math.random() * 4096;
+    const cy = Math.random() * 4096;
+    const size = 50 + Math.random() * 100;
+    const outerStar = [];
+    const innerHole = [];
+    const numPoints = 5 + Math.floor(Math.random() * 5);
+    for (let j = 0; j < numPoints * 2; j++) {
+      const angle = -(j / (numPoints * 2)) * Math.PI * 2;
+      const r = j % 2 === 0 ? size : size * 0.4;
+      const p = [~~(cx + Math.cos(angle) * r), ~~(cy + Math.sin(angle) * r)];
+      outerStar.push(p);
+    }
+    const holePoints = 5;
+    const holeSize = size * 0.25;
+    for (let j = 0; j < holePoints; j++) {
+      const angle = j / holePoints * Math.PI * 2;
+      const p = [
+        ~~(cx + Math.cos(angle) * holeSize),
+        ~~(cy + Math.sin(angle) * holeSize)
+      ];
+      innerHole.push(p);
+    }
+    const polygonRings = [outerStar, innerHole];
+    addPolygon(
+      polygonRings,
+      // 外周と穴を含んだ多重配列を渡す
+      [Math.random(), Math.random(), Math.random(), Math.random()],
+      [Math.random(), Math.random(), Math.random(), Math.random()],
+      2 + Math.random() * 15
+    );
+  }
+  for (let i = 0; i < NUM_LINES; i++) {
+    const points = [];
+    const numSegments = 2 + Math.floor(Math.random() * 10);
+    let sx = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
+    let sy = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
+    points.push([sx, sy]);
+    for (let j = 0; j < numSegments; j++) {
+      sx += ~~(Math.random() * 200 - 100);
+      sy += ~~(Math.random() * 200 - 100);
+      sx = sx >= 4096 ? 4096 : sx < 0 ? 0 : sx;
+      sy = sy >= 4096 ? 4096 : sy < 0 ? 0 : sy;
+      points.push([sx, sy]);
+    }
+    addPolyline(
+      points,
+      [Math.random(), Math.random(), Math.random(), Math.random()],
+      2 + Math.random() * 15
+    );
+  }
+  commandStructs.forEach((cmd) => {
+    let count = 0;
+    if (cmd.fig_type === 0) count = cmd.index_count;
+    else if (cmd.fig_type === 1) count = (cmd.index_count - 1) * 6;
+    else if (cmd.fig_type === 2) count = cmd.index_count * 3;
+    if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
+  });
+  const vertexBufferSize = allVertices.length * 4;
+  const vertexBuffer = device.createBuffer({
+    size: vertexBufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+  });
+  const indexBufferSize = allIndices.length * 4;
+  const indexBuffer = device.createBuffer({
+    size: indexBufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+  });
+  const STRIDE = 48;
+  const commandBufferSize = commandStructs.length * STRIDE;
+  const commandBuffer = device.createBuffer({
+    size: commandBufferSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+  });
+  const vertexData = new Uint32Array(allVertices);
+  const indexData = new Uint32Array(allIndices);
+  const commandArrayBuffer = new ArrayBuffer(commandBufferSize);
+  const commandView = new DataView(commandArrayBuffer);
+  commandStructs.forEach((cmd, i) => {
+    const offset = i * STRIDE;
+    commandView.setFloat32(offset + 0, cmd.color[0], true);
+    commandView.setFloat32(offset + 4, cmd.color[1], true);
+    commandView.setFloat32(offset + 8, cmd.color[2], true);
+    commandView.setFloat32(offset + 12, cmd.color[3], true);
+    commandView.setFloat32(offset + 16, cmd.thickness, true);
+    commandView.setUint32(offset + 20, cmd.index_base, true);
+    commandView.setUint32(offset + 24, cmd.index_count, true);
+    commandView.setUint32(offset + 28, cmd.fig_type, true);
+    commandView.setUint32(offset + 32, cmd.vertex_base, true);
+  });
+  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+  device.queue.writeBuffer(indexBuffer, 0, indexData);
+  device.queue.writeBuffer(
+    commandBuffer,
+    0,
+    new Uint8Array(commandArrayBuffer)
+  );
+  return {
+    commandBuffer,
+    vertexBuffer,
+    indexBuffer,
+    maxVerticesPerInstance,
+    comLen: commandStructs.length
+  };
+}
 
 // src/js/index.js
 var sab = new SharedArrayBuffer(12);
@@ -560,196 +863,14 @@ async function init() {
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
   context.configure({
     device,
-    format: presentationFormat,
-    alphaMode: "premultiplied"
+    format: presentationFormat
+    // alphaMode: "premultiplied",
   });
-  let isDragging = false;
-  let previousMousePosition = { x: 0, y: 0 };
-  let allVertices = [];
-  let allIndices = [];
-  let commandStructs = [];
-  let maxVerticesPerInstance = 0;
-  async function generateSceneData() {
-    allVertices = [];
-    allIndices = [];
-    commandStructs = [];
-    maxVerticesPerInstance = 0;
-    let vertexBase = 0;
-    let indexBase = 0;
-    function addPolygon(rings, fillColor, strokeColor, strokeThickness) {
-      const earcutRawData = [];
-      const flatData = [];
-      const holeIndices = [];
-      let currentVertexCount = 0;
-      for (let i = 0; i < rings.length; i++) {
-        const ring = rings[i];
-        if (ring.length === 0) continue;
-        if (i > 0) {
-          holeIndices.push(currentVertexCount);
-        }
-        for (const p of ring) {
-          earcutRawData.push(p[0], p[1]);
-          const combined = (p[1] & 65535) << 16 | p[0] & 65535;
-          flatData.push(combined);
-          currentVertexCount++;
-        }
-      }
-      const indices = earcut(earcutRawData, holeIndices);
-      if (indices.length === 0) return;
-      const vertexCount = flatData.length;
-      allVertices.push(...flatData);
-      allIndices.push(...indices);
-      commandStructs.push({
-        color: fillColor,
-        thickness: 0,
-        index_base: indexBase,
-        index_count: indices.length,
-        fig_type: 0,
-        vertex_base: vertexBase
-      });
-      vertexBase += vertexCount;
-      indexBase += indices.length;
-      for (const ring of rings) {
-        if (ring.length > 0) {
-          const strokePoints = [...ring, ring[0]];
-          addPolyline(strokePoints, strokeColor, strokeThickness);
-        }
-      }
-    }
-    function addPolyline(points, color, thickness) {
-      for (const p of points) {
-        const combined = (p[1] & 65535) << 16 | p[0] & 65535;
-        allVertices.push(combined);
-      }
-      commandStructs.push({
-        color,
-        thickness,
-        index_base: 0,
-        index_count: points.length,
-        fig_type: 1,
-        vertex_base: vertexBase
-      });
-      for (let i = 0; i < points.length; i++) {
-        commandStructs.push({
-          color,
-          thickness,
-          index_base: i,
-          index_count: 32,
-          // 分割数32で固定
-          fig_type: 2,
-          vertex_base: vertexBase
-        });
-      }
-      vertexBase += points.length;
-    }
-    const NUM_POLYGONS = 5e3;
-    const NUM_LINES = 5e3;
-    for (let i = 0; i < NUM_POLYGONS; i++) {
-      const cx = Math.random() * 4096;
-      const cy = Math.random() * 4096;
-      const size = 50 + Math.random() * 100;
-      const outerStar = [];
-      const innerHole = [];
-      const numPoints = 5 + Math.floor(Math.random() * 5);
-      for (let j = 0; j < numPoints * 2; j++) {
-        const angle = -(j / (numPoints * 2)) * Math.PI * 2;
-        const r = j % 2 === 0 ? size : size * 0.4;
-        const p = [~~(cx + Math.cos(angle) * r), ~~(cy + Math.sin(angle) * r)];
-        outerStar.push(p);
-      }
-      const holePoints = 5;
-      const holeSize = size * 0.25;
-      for (let j = 0; j < holePoints; j++) {
-        const angle = j / holePoints * Math.PI * 2;
-        const p = [
-          ~~(cx + Math.cos(angle) * holeSize),
-          ~~(cy + Math.sin(angle) * holeSize)
-        ];
-        innerHole.push(p);
-      }
-      const polygonRings = [outerStar, innerHole];
-      addPolygon(
-        polygonRings,
-        // 外周と穴を含んだ多重配列を渡す
-        [Math.random(), Math.random(), Math.random(), Math.random()],
-        [Math.random(), Math.random(), Math.random(), Math.random()],
-        2 + Math.random() * 15
-      );
-    }
-    for (let i = 0; i < NUM_LINES; i++) {
-      const points = [];
-      const numSegments = 2 + Math.floor(Math.random() * 10);
-      let sx = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
-      let sy = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
-      points.push([sx, sy]);
-      for (let j = 0; j < numSegments; j++) {
-        sx += ~~(Math.random() * 200 - 100);
-        sy += ~~(Math.random() * 200 - 100);
-        sx = sx >= 4096 ? 4096 : sx < 0 ? 0 : sx;
-        sy = sy >= 4096 ? 4096 : sy < 0 ? 0 : sy;
-        points.push([sx, sy]);
-      }
-      addPolyline(
-        points,
-        [Math.random(), Math.random(), Math.random(), Math.random()],
-        2 + Math.random() * 15
-      );
-    }
-    commandStructs.forEach((cmd) => {
-      let count = 0;
-      if (cmd.fig_type === 0) count = cmd.index_count;
-      else if (cmd.fig_type === 1) count = (cmd.index_count - 1) * 6;
-      else if (cmd.fig_type === 2) count = cmd.index_count * 3;
-      if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
-    });
-  }
-  generateSceneData();
+  const tile = await generateSceneData(device);
   const uniformBuffer = device.createBuffer({
     size: 32,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
-  const vertexBufferSize = allVertices.length * 4;
-  const vertexBuffer = device.createBuffer({
-    size: vertexBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-  const indexBufferSize = allIndices.length * 4;
-  const indexBuffer = device.createBuffer({
-    size: indexBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-  const commandBufferSize = commandStructs.length * 48;
-  const commandBuffer = device.createBuffer({
-    size: commandBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-  function uploadDataToGPU() {
-    const vertexData = new Uint32Array(allVertices);
-    const indexData = new Uint32Array(allIndices);
-    const STRIDE = 48;
-    const commandBufferSize2 = commandStructs.length * STRIDE;
-    const commandArrayBuffer = new ArrayBuffer(commandBufferSize2);
-    const commandView = new DataView(commandArrayBuffer);
-    commandStructs.forEach((cmd, i) => {
-      const offset = i * STRIDE;
-      commandView.setFloat32(offset + 0, cmd.color[0], true);
-      commandView.setFloat32(offset + 4, cmd.color[1], true);
-      commandView.setFloat32(offset + 8, cmd.color[2], true);
-      commandView.setFloat32(offset + 12, cmd.color[3], true);
-      commandView.setFloat32(offset + 16, cmd.thickness, true);
-      commandView.setUint32(offset + 20, cmd.index_base, true);
-      commandView.setUint32(offset + 24, cmd.index_count, true);
-      commandView.setUint32(offset + 28, cmd.fig_type, true);
-      commandView.setUint32(offset + 32, cmd.vertex_base, true);
-    });
-    device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-    device.queue.writeBuffer(indexBuffer, 0, indexData);
-    device.queue.writeBuffer(
-      commandBuffer,
-      0,
-      new Uint8Array(commandArrayBuffer)
-    );
-  }
   function updateUniforms() {
     device.queue.writeBuffer(
       uniformBuffer,
@@ -762,14 +883,16 @@ async function init() {
       // 12バイト分 (f32 x 3要素分)
     );
   }
-  uploadDataToGPU();
+  function updateUniforms2() {
+    device.queue.writeBuffer(
+      uniformBuffer,
+      12,
+      // 後半の12バイトの位置から書き込み
+      new Float32Array([canvas.width, canvas.height])
+    );
+  }
   updateUniforms();
-  device.queue.writeBuffer(
-    uniformBuffer,
-    12,
-    // 後半の12バイトの位置から書き込み
-    new Float32Array([canvas.width, canvas.height])
-  );
+  updateUniforms2();
   const shaderModule = device.createShaderModule({ code: shader_default });
   const pipeline = device.createRenderPipeline({
     layout: "auto",
@@ -786,9 +909,9 @@ async function init() {
     layout: pipeline.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: vertexBuffer } },
-      { binding: 2, resource: { buffer: indexBuffer } },
-      { binding: 3, resource: { buffer: commandBuffer } }
+      { binding: 1, resource: { buffer: tile.vertexBuffer } },
+      { binding: 2, resource: { buffer: tile.indexBuffer } },
+      { binding: 3, resource: { buffer: tile.commandBuffer } }
     ]
   });
   function render() {
@@ -805,162 +928,18 @@ async function init() {
     });
     renderPass.setPipeline(pipeline);
     renderPass.setBindGroup(0, bindGroup);
-    renderPass.draw(maxVerticesPerInstance, commandStructs.length, 0, 0);
+    renderPass.draw(tile.maxVerticesPerInstance, tile.comLen, 0, 0);
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
     fpsCounter.update();
   }
   render();
-  window.addEventListener("resize", () => {
-    canvas.width = window.innerWidth * devicePixelRatio;
-    canvas.height = window.innerHeight * devicePixelRatio;
-    device.queue.writeBuffer(
-      uniformBuffer,
-      12,
-      // 後半の12バイトの位置から書き込み
-      new Float32Array([canvas.width, canvas.height])
-    );
-    render();
-  });
-  canvas.addEventListener(
-    "wheel",
-    (e) => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left) / rect.width * 2 - 1;
-      const mouseY = -((e.clientY - rect.top) / rect.height * 2 - 1);
-      const zoomFactor = 1.1;
-      const oldZoom = viewArray[2];
-      if (e.deltaY < 0) {
-        viewArray[2] *= zoomFactor;
-      } else {
-        viewArray[2] /= zoomFactor;
-      }
-      viewArray[2] = Math.max(0.1, Math.min(viewArray[2], 100));
-      viewArray[0] += mouseX / oldZoom - mouseX / viewArray[2];
-      viewArray[1] += mouseY / oldZoom - mouseY / viewArray[2];
-      updateUniforms();
-      render();
-    },
-    { passive: false }
+  mouseevents_default(
+    viewArray,
+    render,
+    updateUniforms,
+    updateUniforms2,
+    generateSceneData
   );
-  canvas.addEventListener("mousedown", (e) => {
-    if (e.button === 0) {
-      isDragging = true;
-      previousMousePosition = { x: e.clientX, y: e.clientY };
-    }
-  });
-  window.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-    const deltaX = e.clientX - previousMousePosition.x;
-    const deltaY = e.clientY - previousMousePosition.y;
-    const ndcX = deltaX / canvas.width * (canvas.width / window.innerWidth);
-    const ndcY = -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
-    viewArray[0] -= ndcX / viewArray[2];
-    viewArray[1] -= ndcY / viewArray[2];
-    previousMousePosition = { x: e.clientX, y: e.clientY };
-    updateUniforms();
-    render();
-  });
-  window.addEventListener("mouseup", () => {
-    isDragging = false;
-  });
-  let initialTouchDistance = 0;
-  let initialZoom = 1;
-  function getTouchDistance(touch1, touch2) {
-    const dx = touch1.clientX - touch2.clientX;
-    const dy = touch1.clientY - touch2.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-  canvas.addEventListener(
-    "touchstart",
-    (e) => {
-      e.preventDefault();
-      if (e.touches.length === 1) {
-        isDragging = true;
-        previousMousePosition = {
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY
-        };
-      } else if (e.touches.length === 2) {
-        isDragging = false;
-        initialTouchDistance = getTouchDistance(e.touches[0], e.touches[1]);
-        initialZoom = viewArray[2];
-      }
-    },
-    { passive: false }
-  );
-  canvas.addEventListener(
-    "touchmove",
-    (e) => {
-      e.preventDefault();
-      if (e.touches.length === 1 && isDragging) {
-        const deltaX = e.touches[0].clientX - previousMousePosition.x;
-        const deltaY = e.touches[0].clientY - previousMousePosition.y;
-        const ndcX = deltaX / canvas.width * (canvas.width / window.innerWidth);
-        const ndcY = -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
-        viewArray[0] -= ndcX / viewArray[2];
-        viewArray[1] -= ndcY / viewArray[2];
-        previousMousePosition = {
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY
-        };
-        updateUniforms();
-        render();
-      } else if (e.touches.length === 2) {
-        const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
-        if (initialTouchDistance > 0) {
-          const factor = currentDistance / initialTouchDistance;
-          viewArray[2] = initialZoom * factor;
-          viewArray[2] = Math.max(0.1, Math.min(viewArray[2], 100));
-          updateUniforms();
-          render();
-        }
-      }
-    },
-    { passive: false }
-  );
-  canvas.addEventListener("touchend", (e) => {
-    e.preventDefault();
-    isDragging = false;
-    initialTouchDistance = 0;
-  });
-  document.getElementById("regenButton").addEventListener("click", () => {
-    generateSceneData();
-    uploadDataToGPU();
-    render();
-  });
 }
 init();
-var fpsCounter = (() => {
-  const div = document.createElement("div");
-  div.style.position = "fixed";
-  div.style.bottom = "10px";
-  div.style.left = "10px";
-  div.style.padding = "6px 10px";
-  div.style.background = "rgba(0, 0, 0, 0.8)";
-  div.style.color = "#00ffcc";
-  div.style.fontFamily = "monospace";
-  div.style.fontSize = "14px";
-  div.style.fontWeight = "bold";
-  div.style.borderRadius = "4px";
-  div.style.zIndex = "99999";
-  div.style.pointerEvents = "none";
-  div.innerText = "FPS: --";
-  document.body.appendChild(div);
-  let lastTime = performance.now();
-  let frameCount = 0;
-  return {
-    update() {
-      frameCount++;
-      const now = performance.now();
-      const delta = now - lastTime;
-      if (delta >= 500) {
-        const fps = frameCount * 1e3 / delta;
-        div.innerText = `FPS: ${fps.toFixed(1)}`;
-        frameCount = 0;
-        lastTime = now;
-      }
-    }
-  };
-})();
