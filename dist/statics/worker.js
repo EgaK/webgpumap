@@ -1,5 +1,5 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{packed_pos:u32,feature_id:u32,}struct Property{fillColor:vec4f,lineColor:vec4f,thickness:f32,index_base:u32,index_count:u32,vertex_base:u32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;@group(1)@binding(1)var<storage,read>primitive_vertices:array<PrimitiveVertex>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}@vertex fn vs_polygon(@builtin(vertex_index)v_idx:u32)->VertexOutput{var output:VertexOutput;let vertex_data=primitive_vertices[v_idx];let prop=properties[vertex_data.feature_id];let raw_pos=vertex_data.packed_pos;let ndc_pos=raw_to_ndc(raw_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(vertex_data.feature_id)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=prop.fillColor;return output;}@vertex fn vs_thinline(@builtin(vertex_index)v_idx:u32)->VertexOutput{var output:VertexOutput;let vertex_data=primitive_vertices[v_idx];let prop=properties[vertex_data.feature_id];let raw_pos=vertex_data.packed_pos;let ndc_pos=raw_to_ndc(raw_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(vertex_data.feature_id)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct Property{fillColor:vec4f,lineColor:vec4f,thickness:f32,index_base:u32,index_count:u32,vertex_base:u32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=prop.fillColor;return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
 
 // src/js/util/earcut.dev.js
 var steiners = /* @__PURE__ */ new Set();
@@ -714,7 +714,7 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
   device.queue.writeBuffer(propertyBuffer, 0, commandData);
   const vertexBuffer = device.createBuffer({
     size: tileData.allVertex.length * 8,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
   });
   const vertexData = new Uint32Array(tileData.allVertex);
   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
@@ -734,16 +734,16 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
     layout: tileBindGroupLayout,
     // グループ1の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: propertyBuffer } },
+      { binding: 0, resource: { buffer: propertyBuffer } }
       // タイル個別のバッファを紐付け
-      { binding: 1, resource: { buffer: vertexBuffer } }
-      // ⭐ 頂点バッファをここに紐付ける
+      // { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
     ]
   });
   return {
     bindGroup,
     propStructs: tileData.propStructs,
     propertyBuffer,
+    vertexBuffer,
     polygonIndexBuffer,
     polygonIndexCount: tileData.polygonIndex.length,
     borderIndexBuffer,
@@ -1588,12 +1588,12 @@ async function init(canvas, size, viewArray) {
         // 頂点シェーダーで使う場合
         buffer: { type: "read-only-storage" }
         // ストレージバッファ(読み込み専用)が入りますよという宣言
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" }
       }
+      // {
+      //   binding: 1,
+      //   visibility: GPUShaderStage.VERTEX,
+      //   buffer: { type: "read-only-storage" },
+      // },
     ]
   });
   const shaderModule = device.createShaderModule({ code: shader_default });
@@ -1602,7 +1602,28 @@ async function init(canvas, size, viewArray) {
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
     }),
-    vertex: { module: shaderModule, entryPoint: "vs_polygon" },
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vs_polygon",
+      buffers: [
+        {
+          arrayStride: 8,
+          stepMode: "vertex",
+          attributes: [
+            {
+              shaderLocation: 0,
+              offset: 0,
+              format: "uint32"
+            },
+            {
+              shaderLocation: 1,
+              offset: 4,
+              format: "uint32"
+            }
+          ]
+        }
+      ]
+    },
     fragment: {
       module: shaderModule,
       entryPoint: "fs_main",
@@ -1625,7 +1646,28 @@ async function init(canvas, size, viewArray) {
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
     }),
-    vertex: { module: shaderModule, entryPoint: "vs_thinline" },
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vs_thinline",
+      buffers: [
+        {
+          arrayStride: 8,
+          stepMode: "vertex",
+          attributes: [
+            {
+              shaderLocation: 0,
+              offset: 0,
+              format: "uint32"
+            },
+            {
+              shaderLocation: 1,
+              offset: 4,
+              format: "uint32"
+            }
+          ]
+        }
+      ]
+    },
     fragment: {
       module: shaderModule,
       entryPoint: "fs_main",
@@ -1733,6 +1775,7 @@ async function init(canvas, size, viewArray) {
     for (const tile of visibleTiles) {
       renderPass.setBindGroup(1, tile.bindGroup);
       renderPass.setPipeline(polygonPipeline);
+      renderPass.setVertexBuffer(0, tile.vertexBuffer);
       renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       renderPass.setPipeline(borderPipeline);

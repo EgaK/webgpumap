@@ -80,11 +80,11 @@ async function init(canvas, size, viewArray) {
         visibility: GPUShaderStage.VERTEX, // 頂点シェーダーで使う場合
         buffer: { type: "read-only-storage" }, // ストレージバッファ(読み込み専用)が入りますよという宣言
       },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" },
-      },
+      // {
+      //   binding: 1,
+      //   visibility: GPUShaderStage.VERTEX,
+      //   buffer: { type: "read-only-storage" },
+      // },
     ],
   });
 
@@ -97,7 +97,28 @@ async function init(canvas, size, viewArray) {
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
     }),
-    vertex: { module: shaderModule, entryPoint: "vs_polygon" },
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vs_polygon",
+      buffers: [
+        {
+          arrayStride: 8,
+          stepMode: "vertex",
+          attributes: [
+            {
+              shaderLocation: 0,
+              offset: 0,
+              format: "uint32",
+            },
+            {
+              shaderLocation: 1,
+              offset: 4,
+              format: "uint32",
+            },
+          ],
+        },
+      ],
+    },
     fragment: {
       module: shaderModule,
       entryPoint: "fs_main",
@@ -118,7 +139,28 @@ async function init(canvas, size, viewArray) {
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
     }),
-    vertex: { module: shaderModule, entryPoint: "vs_thinline" },
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vs_thinline",
+      buffers: [
+        {
+          arrayStride: 8,
+          stepMode: "vertex",
+          attributes: [
+            {
+              shaderLocation: 0,
+              offset: 0,
+              format: "uint32",
+            },
+            {
+              shaderLocation: 1,
+              offset: 4,
+              format: "uint32",
+            },
+          ],
+        },
+      ],
+    },
     fragment: {
       module: shaderModule,
       entryPoint: "fs_main",
@@ -238,6 +280,7 @@ async function init(canvas, size, viewArray) {
       renderPass.setBindGroup(1, tile.bindGroup);
       //ポリゴン
       renderPass.setPipeline(polygonPipeline);
+      renderPass.setVertexBuffer(0, tile.vertexBuffer);
       renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       // ボーダー

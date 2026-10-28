@@ -26,7 +26,8 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
 
   const vertexBuffer = device.createBuffer({
     size: tileData.allVertex.length * 8,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage:
+      GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   const vertexData = new Uint32Array(tileData.allVertex);
   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
@@ -52,7 +53,7 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     layout: tileBindGroupLayout, // グループ1の設計図を指定
     entries: [
       { binding: 0, resource: { buffer: propertyBuffer } }, // タイル個別のバッファを紐付け
-      { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
+      // { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
     ],
   });
 
@@ -60,6 +61,7 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     bindGroup,
     propStructs: tileData.propStructs,
     propertyBuffer,
+    vertexBuffer,
     polygonIndexBuffer,
     polygonIndexCount: tileData.polygonIndex.length,
     borderIndexBuffer,

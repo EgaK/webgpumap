@@ -1,6 +1,6 @@
 struct PrimitiveVertex {
-  packed_pos: u32,
-  feature_id: u32,
+  @location(0) packed_pos: u32,
+  @location(1) feature_id: u32,
 }
 struct Property {
   fillColor: vec4f,
@@ -21,7 +21,7 @@ struct Uniforms {
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(1) @binding(0) var<storage, read> properties: array<Property>;
-@group(1) @binding(1) var<storage, read> primitive_vertices: array<PrimitiveVertex>;
+// @group(1) @binding(1) var<storage, read> primitive_vertices: array<PrimitiveVertex>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -48,28 +48,35 @@ fn raw_to_ndc(packed_val: u32) -> vec2f {
 }
 
 @vertex
-fn vs_polygon(@builtin(vertex_index) v_idx: u32) -> VertexOutput {
+fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
     var output: VertexOutput;
-
-    // ★ 複雑なオフセット計算は一切不要！流れてきたインデックスで直接構造体を取得
-    let vertex_data = primitive_vertices[v_idx];
-
-    // 頂点データから地物IDを取り出し、プロパティ構造体を逆引きする
-    let prop = properties[vertex_data.feature_id];
-
-    // 座標のデコード（以前直した正しいロジック）
-    let raw_pos = vertex_data.packed_pos;
-    let ndc_pos = raw_to_ndc(raw_pos);
+    let prop = properties[input.feature_id]; // 直接アクセスできる
+    let ndc_pos = raw_to_ndc(input.packed_pos); // 直接アクセスできる
 
     let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
 
-    var z = f32(vertex_data.feature_id) * 1e-6;
+    var z = f32(input.feature_id) * 1e-6;
     output.position = vec4f(cam_pos, z, 1.0);
 
     // 色などもプロパティから取得
     output.color = prop.fillColor;
     return output;
 }
+
+@vertex
+fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
+  var output: VertexOutput;
+  let prop = properties[input.feature_id]; // 直接アクセスできる
+  let ndc_pos = raw_to_ndc(input.packed_pos); // 直接アクセスできる
+  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
+  var z = f32(input.feature_id) * 1e-6 + 1e-7;
+  output.position = vec4f(cam_pos, z, 1.0);
+
+  // 色などもプロパティから取得
+  output.color = prop.lineColor;
+  return output;
+}
+
 
 // @vertex
 // fn vs_polyline(@builtin(vertex_index) v_idx: u32) -> VertexOutput {
@@ -114,29 +121,6 @@ fn vs_polygon(@builtin(vertex_index) v_idx: u32) -> VertexOutput {
 //   return output;
 // }
 
-@vertex
-fn vs_thinline(@builtin(vertex_index) v_idx: u32) -> VertexOutput {
-  var output: VertexOutput;
-
-  // ★ 複雑なオフセット計算は一切不要！流れてきたインデックスで直接構造体を取得
-  let vertex_data = primitive_vertices[v_idx];
-
-  // 頂点データから地物IDを取り出し、プロパティ構造体を逆引きする
-  let prop = properties[vertex_data.feature_id];
-
-  // 座標のデコード（以前直した正しいロジック）
-  let raw_pos = vertex_data.packed_pos;
-  let ndc_pos = raw_to_ndc(raw_pos);
-
-  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
-
-  var z = f32(vertex_data.feature_id) * 1e-6 + 1e-7;
-  output.position = vec4f(cam_pos, z, 1.0);
-
-  // 色などもプロパティから取得
-  output.color = prop.lineColor;
-  return output;
-}
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4f {
