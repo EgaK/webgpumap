@@ -3,8 +3,8 @@ import earcut from "./util/earcut.dev";
 export default async function generateSceneData() {
   // 配列をきれいにリセット
   let propStructs = [];
-  let allVertex = [];
-  let allVertexBase = 0;
+  let polygonVertex = [];
+  let polygonVertexBase = 0;
 
   let polygonIndex = [];
   let polygonIndexBase = 0;
@@ -36,8 +36,8 @@ export default async function generateSceneData() {
 
         // GPUバッファ用（16ビットのバイナリを取り出してドッキング）
         const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-        allVertex.push(combined);
-        allVertex.push(propStructs.length); // propIDに相当
+        polygonVertex.push(combined);
+        polygonVertex.push(propStructs.length); // propIDに相当
 
         currentVertexCount++;
       }
@@ -46,18 +46,18 @@ export default async function generateSceneData() {
     // 生のX,Y配列と、穴の位置配列を渡して三角形分割を行う
     const indices = earcut(earcutRawData, holeIndices);
 
-    if (indices.length === 0) return;
+    if (!indices.length) return;
 
     // polygonIndex.push(...indices);
     indices.forEach((idx) => {
       // 0番目の頂点ではなく、(これまでの総頂点数 + idx) 番目の頂点を指すようにする
-      polygonIndex.push(allVertexBase + idx);
+      polygonIndex.push(polygonVertexBase + idx);
     });
     // for (let i = 0; i < indices.length; i++) {
     //   const fromIdx = indices[i];
     //   // 最後の頂点の場合は、最初の頂点に戻す
     //   // const toIdx = indices[(i + 1) % indices.length];
-    //   polygonIndex.push(allVertexBase + fromIdx);
+    //   polygonIndex.push(polygonVertexBase + fromIdx);
     //   // borderIndex.push(borderIndexBase + fromIdx);
     //   // borderIndex.push(borderIndexBase + toIdx);
     // }
@@ -69,7 +69,7 @@ export default async function generateSceneData() {
       index_base: polygonIndexBase,
       index_count: indices.length,
       fig_type: 0,
-      vertex_base: allVertexBase,
+      vertex_base: polygonVertexBase,
     });
 
     // 枠線（折れ線）用の処理
@@ -86,7 +86,7 @@ export default async function generateSceneData() {
     }
 
     // グローバルなオフセットの更新
-    allVertexBase += currentVertexCount;
+    polygonVertexBase += currentVertexCount;
     polygonIndexBase += indices.length;
   }
 
@@ -94,8 +94,8 @@ export default async function generateSceneData() {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
       const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-      allVertex.push(combined);
-      allVertex.push(propStructs.length); // featureIDに相当
+      polygonVertex.push(combined);
+      polygonVertex.push(propStructs.length); // featureIDに相当
       borderIndex.push(borderIndexBase + i);
       borderIndex.push(borderIndexBase + (i + 1 == points.length ? 0 : i + 1));
     }
@@ -108,7 +108,7 @@ export default async function generateSceneData() {
       index_base: 0,
       index_count: points.length,
       fig_type: 1,
-      vertex_base: allVertexBase,
+      vertex_base: polygonVertexBase,
     });
   }
 
@@ -116,7 +116,7 @@ export default async function generateSceneData() {
   function addPolyline2(points, color, thickness) {
     for (const p of points) {
       const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-      allVertex.push(combined);
+      polygonVertex.push(combined);
     }
     propStructs.push({
       color: color,
@@ -124,7 +124,7 @@ export default async function generateSceneData() {
       index_base: 0,
       index_count: points.length,
       fig_type: 1,
-      vertex_base: allVertexBase,
+      vertex_base: polygonVertexBase,
     });
 
     // 各頂点に関節用の「丸」を追加
@@ -135,11 +135,11 @@ export default async function generateSceneData() {
     //     index_base: i,
     //     index_count: 32, // 分割数32で固定
     //     fig_type: 2,
-    //     vertex_base: allVertexBase,
+    //     vertex_base: polygonVertexBase,
     //   });
     // }
 
-    allVertexBase += points.length;
+    polygonVertexBase += points.length;
   }
 
   // --- データのランダム自動生成 (5000個ずつの例) ---
@@ -213,7 +213,7 @@ export default async function generateSceneData() {
 
   return {
     propStructs,
-    allVertex,
+    polygonVertex,
     polygonIndex,
     borderIndex,
   };

@@ -1038,6 +1038,6 @@ canvas[0].width = 800;
 canvas[0].height = 800;
 canvas.css({ width: "400px", height: "400px" });
 var offcanvas = canvas[0].transferControlToOffscreen();
-var worker = new Worker("/js/worker.min.js");
+var worker = new Worker("/js/worker.js");
 worker.postMessage({ "c": offcanvas, "s": [800, 800], "b": sab }, [offcanvas]);
 mouseevents_default(viewArray);

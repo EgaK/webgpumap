@@ -55,7 +55,7 @@ fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
 
     let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
 
-    var z = f32(input.feature_id) * 1e-6;
+    var z = f32(input.feature_id) * 1e-6 + 1e-7;
     output.position = vec4f(cam_pos, z, 1.0);
 
     // 色などもプロパティから取得
@@ -69,7 +69,7 @@ fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
   let prop = properties[input.feature_id]; // 直接アクセスできる
   let ndc_pos = raw_to_ndc(input.packed_pos); // 直接アクセスできる
   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
-  var z = f32(input.feature_id) * 1e-6 + 1e-7;
+  var z = f32(input.feature_id) * 1e-6 + 2e-7;
   output.position = vec4f(cam_pos, z, 1.0);
 
   // 色などもプロパティから取得

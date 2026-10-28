@@ -24,13 +24,13 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   });
   device.queue.writeBuffer(propertyBuffer, 0, commandData);
 
-  const vertexBuffer = device.createBuffer({
-    size: tileData.allVertex.length * 8,
+  const polygonVertexBuffer = device.createBuffer({
+    size: tileData.polygonVertex.length * 8,
     usage:
       GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
-  const vertexData = new Uint32Array(tileData.allVertex);
-  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+  const polygonVertexData = new Uint32Array(tileData.polygonVertex);
+  device.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
 
   const polygonIndexBuffer = device.createBuffer({
     size: tileData.polygonIndex.length * 4,
@@ -61,7 +61,7 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     bindGroup,
     propStructs: tileData.propStructs,
     propertyBuffer,
-    vertexBuffer,
+    polygonVertexBuffer,
     polygonIndexBuffer,
     polygonIndexCount: tileData.polygonIndex.length,
     borderIndexBuffer,

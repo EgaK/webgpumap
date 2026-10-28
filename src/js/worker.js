@@ -279,8 +279,8 @@ async function init(canvas, size, viewArray) {
     for (const tile of visibleTiles) {
       renderPass.setBindGroup(1, tile.bindGroup);
       //ポリゴン
+      renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
       renderPass.setPipeline(polygonPipeline);
-      renderPass.setVertexBuffer(0, tile.vertexBuffer);
       renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       // ボーダー
