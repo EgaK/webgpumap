@@ -1,348 +1,254 @@
-var canvas, render;
-
-/*
-// worker.js (Workerスレッド)
-let viewArray; // メインから共有されるSABのビュー
-let device, uniformBuffer, pipeline; // WebGPU関係の変数
+import shaderCode from "./shader.wgsl";
+import generateSceneData from "./generateSene";
+import onCreateTile from "./onCreateTile";
+import loadTile from "./loadTile";
 
 self.onmessage = async (e) => {
-  if (e.data.type === 'INIT_MEM') {
-    // メインから送られてきたSABを受け取る
-    viewArray = new Float64Array(e.data.sab);
-
-    // ここでWebGPUの初期化やバッファ作成を行う（以前index.jsでやっていた処理）
-    await initWebGPU();
-
-    // 描画ループをスタート
-    requestAnimationFrame(renderLoop);
+  if (e.data["c"]) {
+    const sab = e.data["b"];
+    const viewArray = new Float32Array(sab);
+    init(e.data["c"], e.data["s"], viewArray);
   }
 };
 
-function renderLoop() {
-  // ★ここがポイント！
-  // 以前はファイルの先頭の変数を読んでいた箇所を、SABからの読み込みに変えるだけ！
-  const currentX = viewArray[0];
-  const currentY = viewArray[1];
-  const currentZoom = viewArray[2];
-
-  // あとは以前1ファイルでやっていた、Uniform Bufferの更新と描画コマンドの発行
-  updateUniformBuffer(currentX, currentY, currentZoom);
-  draw();
-
-  requestAnimationFrame(renderLoop);
-}*/
-
-self.onmessage = async (e) => {
-  if (e.data.canvas) {
-    canvas = e.data.canvas;
-    init(canvas);
-  }
-  e.data.pos &&
-    requestAnimationFrame(() => {
-      render();
-      // draw(e.data.pos);
-    });
-  if (e.data.size) {
-    [canvas.width, canvas.height] = e.data.size;
-    // render実行しないとcanvasの大きさ変更が実canvasに反映されない
-    render?.();
-  }
-};
-
-const init = async (canvas) => {
-  const ctx = canvas.getContext("webgpu");
+async function init(canvas, size, viewArray) {
   const adapter = await navigator.gpu?.requestAdapter();
   const device = await adapter?.requestDevice();
+
+  if (!device) {
+    self.postMessage({
+      type: "error",
+      message: "WebGPU をサポートしていないブラウザ、または環境です。",
+    });
+    return;
+  }
+
+  if (DEVELOP) {
+    device.pushErrorScope("validation");
+    const error = await device.popErrorScope();
+    if (error) {
+      console.error("WebGPU バリデーションエラー:", error.message);
+    }
+    device.lost.then((info) => {
+      console.error(`WebGPU デバイスが喪失しました。理由: ${info.reason}`);
+      console.error(`メッセージ: ${info.message}`);
+
+      // 理由に応じた適切なリカバリ処理
+      if (info.reason === "destroyed") {
+        // 自ら意図して device.destroy() を呼んだ場合
+        console.log("デバイスは意図的に破棄されました。");
+      } else {
+        // 'unknown' などの場合、デバイスの再生成（再初期化）を試みる
+        console.log("デバイスを再初期化します...");
+        // handleDeviceLossAndReinit();
+      }
+    });
+  }
+
+  const context = canvas.getContext("webgpu");
+  canvas.width = size[0];
+  canvas.height = size[1];
+
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
-  ctx.configure({
+  context.configure({
     device,
     format: presentationFormat,
+    alphaMode: "opaque",
+    // alphaMode: "premultiplied",
   });
 
-  const module = device.createShaderModule({
-    code: /* wgsl */ `
-        struct Vertex {
-          @location(0) position: vec2f,
-          @location(1) color: vec4f,
-          @location(2) offset: vec2f,
-          @location(3) scale: vec2f,
-          @location(4) perVertexColor: vec3f,
-        };
+  // ==========================================
+  // 1. 各スロットの「設計図（レイアウト）」を定義する
+  // ==========================================
 
-        struct VSOutput {
-          @builtin(position) position: vec4f,
-          @location(0) color: vec4f,
-        };
-
-        @vertex fn vs(
-          vert: Vertex,
-        ) -> VSOutput {
-          var vsOut: VSOutput;
-          vsOut.position = vec4f(
-              vert.position * vert.scale + vert.offset, 0.0, 1.0);
-          vsOut.color = vert.color * vec4f(vert.perVertexColor, 1);
-          return vsOut;
-        }
-
-        @fragment fn fs(vsOut: VSOutput) -> @location(0) vec4f {
-          return vsOut.color;
-        }
-      `,
-  });
-
-  const pipeline = device.createRenderPipeline({
-    label: "per vertex color",
-    layout: "auto",
-    vertex: {
-      module,
-      buffers: [
-        {
-          arrayStride: 2 * 4 + 4, // 2 floats, 4 bytes each + 4 bytes
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: "float32x2" }, // position
-            { shaderLocation: 4, offset: 8, format: "unorm8x4" }, // perVertexColor
-          ],
-        },
-        {
-          arrayStride: 4 + 2 * 4, // 4 bytes + 2 floats, 4 bytes each
-          stepMode: "instance",
-          attributes: [
-            { shaderLocation: 1, offset: 0, format: "unorm8x4" }, // color
-            { shaderLocation: 2, offset: 4, format: "float32x2" }, // offset
-          ],
-        },
-        {
-          arrayStride: 2 * 4, // 2 floats, 4 bytes each
-          stepMode: "instance",
-          attributes: [
-            { shaderLocation: 3, offset: 0, format: "float32x2" }, // scale
-          ],
-        },
-      ],
-    },
-    fragment: {
-      module,
-      targets: [{ format: presentationFormat }],
-    },
-  });
-
-  const kNumObjects = 100;
-  const objectInfos = [];
-
-  // create 2 vertex buffers
-  const staticUnitSize =
-    4 + // color is 4 bytes
-    2 * 4; // offset is 2 32bit floats (4bytes each)
-  const changingUnitSize = 2 * 4; // scale is 2 32bit floats (4bytes each)
-  const staticVertexBufferSize = staticUnitSize * kNumObjects;
-  const changingVertexBufferSize = changingUnitSize * kNumObjects;
-
-  const staticVertexBuffer = device.createBuffer({
-    label: "static vertex for objects",
-    size: staticVertexBufferSize,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-
-  const changingVertexBuffer = device.createBuffer({
-    label: "changing storage for objects",
-    size: changingVertexBufferSize,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-
-  // offsets to the various uniform values in float32 indices
-  const kColorOffset = 0;
-  const kOffsetOffset = 1;
-
-  const kScaleOffset = 0;
-
-  {
-    const staticVertexValuesU8 = new Uint8Array(staticVertexBufferSize);
-    const staticVertexValuesF32 = new Float32Array(staticVertexValuesU8.buffer);
-    for (let i = 0; i < kNumObjects; ++i) {
-      const staticOffsetU8 = i * staticUnitSize;
-      const staticOffsetF32 = staticOffsetU8 / 4;
-
-      // These are only set once so set them now
-      staticVertexValuesU8.set(
-        // set the color
-        // [rand() * 255, rand() * 255, rand() * 255, 255],
-        // staticOffsetU8 + kColorOffset,
-        [i * 2, i * 2, i * 2, 255],
-        staticOffsetU8 + kColorOffset,
-      );
-
-      const x = ~~(i / 10) / 6 - 0.8;
-      const y = (i % 10) / 6 - 0.8;
-
-      staticVertexValuesF32.set(
-        // set the offset
-        // [rand(-0.9, 0.9), rand(-0.9, 0.9)],
-        // staticOffsetF32 + kOffsetOffset,
-        [x, y],
-        staticOffsetF32 + kOffsetOffset,
-      );
-
-      objectInfos.push({
-        scale: 0.1, //rand(0.2, 0.5),
-      });
-    }
-    device.queue.writeBuffer(staticVertexBuffer, 0, staticVertexValuesF32);
-  }
-
-  // a typed array we can use to update the changingStorageBuffer
-  const vertexValues = new Float32Array(changingVertexBufferSize / 4);
-
-  const { vertexData, indexData, numVertices } = createCircleVertices({
-    radius: 0.5,
-    innerRadius: 0.25,
-  });
-  const vertexBuffer = device.createBuffer({
-    label: "vertex buffer",
-    size: vertexData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-  const indexBuffer = device.createBuffer({
-    label: "index buffer",
-    size: indexData.byteLength,
-    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(indexBuffer, 0, indexData);
-
-  const renderPassDescriptor = {
-    label: "our basic canvas renderPass",
-    colorAttachments: [
+  // グループ0（画面共通Uniform用）の設計図
+  const commonBindGroupLayout = device.createBindGroupLayout({
+    entries: [
       {
-        // view: <- to be filled out when we render
-        clearValue: [0.3, 0.3, 0.3, 1],
-        loadOp: "clear",
-        storeOp: "store",
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
       },
     ],
-  };
+  });
 
-  render = () => {
-    // Get the current texture from the canvas context and
-    // set it as the texture to render to.
-    renderPassDescriptor.colorAttachments[0].view = ctx
-      .getCurrentTexture()
-      .createView();
+  // グループ1（タイル固有のpropertyBuffer用）の設計図
+  const tileBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX, // 頂点シェーダーで使う場合
+        buffer: { type: "read-only-storage" }, // ストレージバッファ(読み込み専用)が入りますよという宣言
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+    ],
+  });
 
-    const encoder = device.createCommandEncoder();
-    const pass = encoder.beginRenderPass(renderPassDescriptor);
-    pass.setPipeline(pipeline);
-    pass.setVertexBuffer(0, vertexBuffer);
-    pass.setVertexBuffer(1, staticVertexBuffer);
-    pass.setVertexBuffer(2, changingVertexBuffer);
-    pass.setIndexBuffer(indexBuffer, "uint32");
+  // ==========================================
+  // 2. 設計図を元に パイプライン を作成する
+  // ==========================================
+  const shaderModule = device.createShaderModule({ code: shaderCode });
+  const polygonPipeline = device.createRenderPipeline({
+    // layout: "auto" の代わりに、2つの設計図を配列で渡す
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
+    }),
+    vertex: { module: shaderModule, entryPoint: "vs_polygon" },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_main",
+      targets: [{ format: presentationFormat }],
+    },
+    primitive: { topology: "triangle-list" },
+    depthStencil: {
+      format: "depth24plus",
+      depthWriteEnabled: true, // ★通常通り深度を書き込む
+      depthCompare: "greater",
+    },
+    multisample: {
+      count: 4, // ★パイプライン側でも4倍を明示
+    },
+  });
+  const borderPipeline = device.createRenderPipeline({
+    // layout: "auto" の代わりに、2つの設計図を配列で渡す
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
+    }),
+    vertex: { module: shaderModule, entryPoint: "vs_thinline" },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_main",
+      targets: [{ format: presentationFormat }],
+    },
+    primitive: { topology: "line-list" },
+    depthStencil: {
+      format: "depth24plus",
+      depthWriteEnabled: false, // ★深度バッファに書き込まない
+      depthCompare: "greater-equal",
+    },
+    multisample: {
+      count: 4, // ★パイプライン側でも4倍を明示
+    },
+  });
 
-    // Set the uniform values in our JavaScript side Float32Array
-    const aspect = canvas.width / canvas.height;
+  if (DEVELOP) {
+    const compilationInfo = await shaderModule.getCompilationInfo();
+    for (const message of compilationInfo.messages) {
+      console.error(
+        `WGSL Error: ${message.message} at line ${message.lineNum}`,
+      );
+    }
+  }
 
-    // set the scales for each object
-    objectInfos.forEach(({ scale }, ndx) => {
-      const offset = ndx * (changingUnitSize / 4);
-      vertexValues.set([scale / aspect, scale], offset + kScaleOffset); // set the scale
+  const uniformBuffer = device.createBuffer({
+    size: 32,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  // ==========================================
+  // 3. 設計図（共通レイアウト）に、実際の一時バッファを紐付ける
+  // ==========================================
+  // 画面全体で1つだけ使い回す実体（BindGroup）
+  const globalBindGroup = device.createBindGroup({
+    layout: commonBindGroupLayout, // グループ0の設計図を指定
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } }, // 実体バッファ
+    ],
+  });
+
+  // 初回のデータ生成を実行
+  const tileData = await generateSceneData();
+  // var tileData = await loadTile([15, 28191, 13180]);
+  console.log("tileData", tileData);
+  const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
+
+  // ユニフォームバッファを更新する関数を作成
+  function updateUniforms() {
+    // 1. offsetとzoom, flagw（16バイト分）を、GPUバッファの先頭（オフセット0）に直接転送
+    device.queue.writeBuffer(
+      uniformBuffer,
+      0,
+      viewArray.buffer, // ArrayBufferを直接指定
+      viewArray.byteOffset, // 開始位置
+      16, // 16バイト分 (f32 x 4要素分)
+    );
+  }
+  function updateUniforms2() {
+    device.queue.writeBuffer(
+      uniformBuffer,
+      16, // 後半の16バイトの位置から書き込み
+      new Float32Array([canvas.width, canvas.height]),
+    );
+  }
+
+  updateUniforms();
+  updateUniforms2();
+
+  // 1. MSAA用のカラーテクスチャ（4倍サンプリング）
+  const msaaColorTexture = device.createTexture({
+    size: [canvas.width, canvas.height],
+    sampleCount: 4, // ★ここを4にする
+    format: navigator.gpu.getPreferredCanvasFormat(),
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+
+  // 2. MSAA用の深度テクスチャ（こちらも4倍にする必要がある）
+  const msaaDepthTexture = device.createTexture({
+    size: [canvas.width, canvas.height],
+    sampleCount: 4, // ★カラーと合わせる
+    format: "depth24plus",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+
+  function render() {
+    requestAnimationFrame(render);
+    if (!viewArray[3]) return;
+    updateUniforms();
+    const commandEncoder = device.createCommandEncoder();
+    const renderPass = commandEncoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: msaaColorTexture.createView(),
+          resolveTarget: context.getCurrentTexture().createView(),
+          clearValue: {
+            r: 0.96,
+            g: 0.97,
+            b: 0.98,
+            a: 1,
+          },
+          loadOp: "clear",
+          storeOp: "discard",
+        },
+      ],
+      depthStencilAttachment: {
+        view: msaaDepthTexture.createView(),
+        depthClearValue: 0.0,
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
+      },
     });
-    // upload all scales at once
-    device.queue.writeBuffer(changingVertexBuffer, 0, vertexValues);
 
-    pass.drawIndexed(numVertices, kNumObjects);
+    renderPass.setBindGroup(0, globalBindGroup);
 
-    pass.end();
+    for (const tile of visibleTiles) {
+      renderPass.setBindGroup(1, tile.bindGroup);
+      //ポリゴン
+      renderPass.setPipeline(polygonPipeline);
+      renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
+      // ボーダー
+      renderPass.setPipeline(borderPipeline);
+      renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
+    }
 
-    const commandBuffer = encoder.finish();
-    device.queue.submit([commandBuffer]);
-  };
-};
-
-// A random number between [min and max)
-// With 1 argument it will be [0 to min)
-// With no arguments it will be [0 to 1)
-const rand = (min, max) => {
-  if (min === undefined) {
-    min = 0;
-    max = 1;
-  } else if (max === undefined) {
-    max = min;
-    min = 0;
+    renderPass.end();
+    device.queue.submit([commandEncoder.finish()]);
+    viewArray[3] = 0;
   }
-  return min + Math.random() * (max - min);
-};
-
-function createCircleVertices({
-  radius = 1,
-  numSubdivisions = 24,
-  innerRadius = 0,
-  startAngle = 0,
-  endAngle = Math.PI * 2,
-} = {}) {
-  // 2 vertices at each subdivision, + 1 to wrap around the circle.
-  const numVertices = (numSubdivisions + 1) * 2;
-  // 2 32-bit values for position (xy) and 1 32-bit value for color (rgb)
-  // The 32-bit color value will be written/read as 4 8-bit values
-  const vertexData = new Float32Array(numVertices * (2 + 1));
-  const colorData = new Uint8Array(vertexData.buffer);
-
-  let offset = 0;
-  let colorOffset = 8;
-  const addVertex = (x, y, r, g, b) => {
-    vertexData[offset++] = x;
-    vertexData[offset++] = y;
-    offset += 1; // skip the color
-    colorData[colorOffset++] = r * 255;
-    colorData[colorOffset++] = g * 255;
-    colorData[colorOffset++] = b * 255;
-    colorOffset += 9; // skip extra byte and the position
-  };
-
-  const innerColor = [1, 1, 1];
-  // const outerColor = [0.1, 0.1, 0.1];
-  const outerColor = [1, 1, 1];
-
-  // 2 vertices per subdivision
-  //
-  // 1  3  5  7  9 ...
-  //
-  // 0  2  4  6  8 ...
-  for (let i = 0; i <= numSubdivisions; ++i) {
-    const angle =
-      startAngle + ((i + 0) * (endAngle - startAngle)) / numSubdivisions;
-
-    const c1 = Math.cos(angle);
-    const s1 = Math.sin(angle);
-
-    addVertex(c1 * radius, s1 * radius, ...outerColor);
-    addVertex(c1 * innerRadius, s1 * innerRadius, ...innerColor);
-  }
-
-  const indexData = new Uint32Array(numSubdivisions * 6);
-  let ndx = 0;
-
-  // 1st tri  2nd tri  3rd tri  4th tri
-  // 0 1 2    2 1 3    2 3 4    4 3 5
-  //
-  // 0--2        2     2--4        4  .....
-  // | /        /|     | /        /|
-  // |/        / |     |/        / |
-  // 1        1--3     3        3--5  .....
-  for (let i = 0; i < numSubdivisions; ++i) {
-    const ndxOffset = i * 2;
-
-    // first triangle
-    indexData[ndx++] = ndxOffset;
-    indexData[ndx++] = ndxOffset + 1;
-    indexData[ndx++] = ndxOffset + 2;
-
-    // second triangle
-    indexData[ndx++] = ndxOffset + 2;
-    indexData[ndx++] = ndxOffset + 1;
-    indexData[ndx++] = ndxOffset + 3;
-  }
-
-  return {
-    vertexData,
-    indexData,
-    numVertices: indexData.length,
-  };
+  render();
 }

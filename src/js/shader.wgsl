@@ -1,159 +1,140 @@
-struct DrawCommand {
-    color: vec4f,       // 0〜15バイト
-    thickness: f32,     // 16〜19バイト
-    index_base: u32,    // 20〜23バイト
-    index_count: u32,   // 24〜27バイト
-    fig_type: u32,      // 28〜31バイト　// 0: Polygon, 1: Polyline, 2: Round Join
-    vertex_base: u32,   // 32〜35バイト
+struct PrimitiveVertex {
+  packed_pos: u32,
+  feature_id: u32,
+}
+struct Property {
+  fillColor: vec4f,
+  lineColor: vec4f,
+  thickness: f32,
+  index_base: u32,
+  index_count: u32,
+  vertex_base: u32,
 }
 
 struct Uniforms {
-    u_offset: vec2f,         // 8バイト (オフセット: 0)  <- viewArray[0], [1]
-    u_zoom: f32,             // 4バイト (オフセット: 8)  <- viewArray[2]
-    u_res_x: f32,            // 12 〜 16 バイト (canvas.width)
-    u_res_y: f32,            // 16 〜 20 バイト (canvas.height)
+  u_offset: vec2f,         // 8バイト (オフセット: 0)  <- viewArray[0], [1]
+  u_zoom: f32,             // 4バイト (オフセット: 8)  <- viewArray[2]
+  u_flag: f32,             // 更新フラグ（必要ないけどpaddingのため配置）
+  u_res_x: f32,            // 16 〜 19 バイト (canvas.width)
+  u_res_y: f32,            // 20 〜 23 バイト (canvas.height)
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(1) @binding(0) var<storage, read> commands: array<DrawCommand>;
-@group(1) @binding(1) var<storage, read> all_vertices: array<u32>;
-@group(1) @binding(2) var<storage, read> all_indices: array<u32>;
+@group(1) @binding(0) var<storage, read> properties: array<Property>;
+@group(1) @binding(1) var<storage, read> primitive_vertices: array<PrimitiveVertex>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) color: vec4f,
 }
 
-// --- 修正箇所②: u32のパッキングデータから、符号(マイナス)を維持してvec2fに復元する関数 ---
 fn unpack_sint16x2(packed: u32) -> vec2f {
-  // 下位16ビット(X)と上位16ビット(Y)を切り出す
-  let raw_x = packed & 0xFFFFu;
-  let raw_y = (packed >> 16u) & 0xFFFFu;
-
-  // 16ビットの数値を32ビットの符号付き整数(i32)に直す（符号拡張）
-  // 左に16シフトして右に16シフトすることで、マイナスのビットを正しく引き延ばします
-  let x = (i32(raw_x) << 16) >> 16;
-  let y = (i32(raw_y) << 16) >> 16;
+  // 下位16ビットを抽出し、左シフト後に算術右シフトで符号拡張
+  let x = (i32(packed & 0xFFFFu) << 16) >> 16;
+  // 上位16ビットを抽出し、右シフト（算術）で符号拡張
+  let y = i32(packed) >> 16;
 
   return vec2f(f32(x), f32(y));
 }
 
-// ★ 整数座標(0〜4096)を、WebGPUの標準空間(-1.0〜1.0)の浮動小数点に変換するヘルパー関数
-// --- 修正箇所③: raw_to_ndc を上記を呼び出す形に変更 ---
 fn raw_to_ndc(packed_val: u32) -> vec2f {
-  // 結合されたu32から、正しいマイナス対応のf32座標を取り出す
   let decoded_pos = unpack_sint16x2(packed_val);
 
-  // 0〜4096基準の座標を -1.0〜1.0 に変換
-  let normalized = decoded_pos / 4096.0;
-  return normalized * 2.0 - 1.0;
+  // MVTは左上が原点(0,0)、WebGPUは左下が(-1,-1)なので、Y軸を反転させる
+  let normalized_x = decoded_pos.x / 4096.0;
+  let normalized_y = 1.0 - (decoded_pos.y / 4096.0); // 1.0 - を入れる
+
+  return vec2f(normalized_x, normalized_y) * 2.0 - 1.0;
 }
 
 @vertex
-fn vs_main(
-  @builtin(vertex_index) v_idx: u32,
-  @builtin(instance_index) inst_idx: u32
-) -> VertexOutput {
-  var output: VertexOutput;
-  let cmd = commands[inst_idx];
-  output.color = cmd.color;
+fn vs_polygon(@builtin(vertex_index) v_idx: u32) -> VertexOutput {
+    var output: VertexOutput;
 
-  // ------------------------------------------
-  // パターン0: ポリゴン
-  // ------------------------------------------
-  if (cmd.fig_type == 0u) {
-    if (v_idx >= cmd.index_count) {
-      output.position = vec4f(0.0, 0.0, 0.0, 0.0);
-      return output;
-    }
-    let global_idx = cmd.index_base + v_idx;
-    let local_vert_idx = all_indices[global_idx];
+    // ★ 複雑なオフセット計算は一切不要！流れてきたインデックスで直接構造体を取得
+    let vertex_data = primitive_vertices[v_idx];
 
-    // ★ 整数座標を読み出し、浮動小数点の NDC(-1〜1) 座標に変換
-    let raw_pos = all_vertices[cmd.vertex_base + local_vert_idx];
+    // 頂点データから地物IDを取り出し、プロパティ構造体を逆引きする
+    let prop = properties[vertex_data.feature_id];
+
+    // 座標のデコード（以前直した正しいロジック）
+    let raw_pos = vertex_data.packed_pos;
     let ndc_pos = raw_to_ndc(raw_pos);
 
-    // カメラ変換を適用（ここからは元のロジックと同じ）
     let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
-    output.position = vec4f(cam_pos, 0.0, 1.0);
+
+    var z = f32(vertex_data.feature_id) * 1e-6;
+    output.position = vec4f(cam_pos, z, 1.0);
+
+    // 色などもプロパティから取得
+    output.color = prop.fillColor;
     return output;
-  }
+}
 
-  // ------------------------------------------
-  // パターン1: 太い折れ線（ズーム不変幅版）
-  // ------------------------------------------
-  if (cmd.fig_type == 1u) {
-    let segment_idx = v_idx / 6u;
-    let corner_idx = v_idx % 6u;
+// @vertex
+// fn vs_polyline(@builtin(vertex_index) v_idx: u32) -> VertexOutput {
+//   var output: VertexOutput;
+//   let vertex_data = primitive_vertices[v_idx];
+//   let prop = properties[vertex_data.feature_id];
+//   output.color = prop.lineColor;
+//   // ★JavaScript側でベースを4にしたため、4で割ることで「何番目の角頂点か」が分かります
+//   let local_vert_idx = v_idx;
+//
+//   // 4つの角のうち、どの角（0〜3）か
+//   let corner_idx = local_vert_idx % 4u;
+//
+//   // 4つで1セグメントなので、4で割ることで「何番目の線分セグメントか」が正確に分かります
+//   let segment_idx = local_vert_idx / 4u;
+//
+//   // 生座標（頂点バッファ）から始点と終点を引っ張る
+//   let p0 = raw_to_ndc(primitive_vertices[prop.vertex_base + segment_idx]);
+//   let p1 = raw_to_ndc(primitive_vertices[prop.vertex_base + segment_idx + 1u]);
+//
+//   // ---- ここから下の座標変換ロジックは、corner_idx の判定方法を4つの角（0〜3）に合わせて最適化します ----
+//   let cam_p0 = (p0 - uniforms.u_offset) * uniforms.u_zoom;
+//   let cam_p1 = (p1 - uniforms.u_offset) * uniforms.u_zoom;
+//
+//   let aspect = uniforms.u_res_x / uniforms.u_res_y;
+//   let dir = normalize(vec2f(cam_p1.x * aspect, cam_p1.y) - vec2f(cam_p0.x * aspect, cam_p0.y));
+//   let normal = vec2f(-dir.y, dir.x);
+//
+//   let thickness_ndc = prop.thickness / uniforms.u_res_y;
+//   let offset = vec2f((normal.x * thickness_ndc * 0.5) / aspect, normal.y * thickness_ndc * 0.5);
+//
+//   var final_pos = vec2f(0.0);
+//
+//   // ★ 4頂点（0, 1, 2, 3）の配置に合わせてオフセットを適用
+//   // 0: 始点の上, 1: 始点の下, 2: 終点の下, 3: 終点の上
+//   if (corner_idx == 0u)      { final_pos = cam_p0 + offset; }
+//   else if (corner_idx == 1u) { final_pos = cam_p0 - offset; }
+//   else if (corner_idx == 2u) { final_pos = cam_p1 - offset; }
+//   else if (corner_idx == 3u) { final_pos = cam_p1 + offset; }
+//
+//   output.position = vec4f(final_pos, 0.0, 1.0);
+//   return output;
+// }
 
-    if (segment_idx >= cmd.index_count - 1u) {
-      output.position = vec4f(0.0, 0.0, 0.0, 0.0);
-      return output;
-    }
+@vertex
+fn vs_thinline(@builtin(vertex_index) v_idx: u32) -> VertexOutput {
+  var output: VertexOutput;
 
-    // ★ 整数座標を読み出し、NDC座標に変換
-    let p0 = raw_to_ndc(all_vertices[cmd.vertex_base + segment_idx]);
-    let p1 = raw_to_ndc(all_vertices[cmd.vertex_base + segment_idx + 1u]);
+  // ★ 複雑なオフセット計算は一切不要！流れてきたインデックスで直接構造体を取得
+  let vertex_data = primitive_vertices[v_idx];
 
-    let cam_p0 = (p0 - uniforms.u_offset) * uniforms.u_zoom;
-    let cam_p1 = (p1 - uniforms.u_offset) * uniforms.u_zoom;
+  // 頂点データから地物IDを取り出し、プロパティ構造体を逆引きする
+  let prop = properties[vertex_data.feature_id];
 
-    let aspect = uniforms.u_res_x / uniforms.u_res_y;
-    let dir = normalize(vec2f(cam_p1.x * aspect, cam_p1.y) - vec2f(cam_p0.x * aspect, cam_p0.y));
-    let normal = vec2f(-dir.y, dir.x);
+  // 座標のデコード（以前直した正しいロジック）
+  let raw_pos = vertex_data.packed_pos;
+  let ndc_pos = raw_to_ndc(raw_pos);
 
-    let thickness_ndc = cmd.thickness / uniforms.u_res_y;
-    let offset = vec2f((normal.x * thickness_ndc * 0.5) / aspect, normal.y * thickness_ndc * 0.5);
+  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
 
-    var final_pos = vec2f(0.0);
-    if (corner_idx == 0u) { final_pos = cam_p0 + offset; }
-    else if (corner_idx == 1u || corner_idx == 4u) { final_pos = cam_p0 - offset; }
-    else if (corner_idx == 2u || corner_idx == 3u) { final_pos = cam_p1 + offset; }
-    else if (corner_idx == 5u) { final_pos = cam_p1 - offset; }
+  var z = f32(vertex_data.feature_id) * 1e-6 + 1e-7;
+  output.position = vec4f(cam_pos, z, 1.0);
 
-    output.position = vec4f(final_pos, 0.0, 1.0);
-    return output;
-  }
-
-  // ------------------------------------------
-  // パターン2: 関節の Round Join（ズーム不変幅版）
-  // ------------------------------------------
-  if (cmd.fig_type == 2u) {
-  // output.color = vec4f(1.0, 0.0, 0.0, 1.0); // ★強制的に真っ赤にする
-      let total_circle_vertices = cmd.index_count * 3u;
-      if (v_idx >= total_circle_vertices) {
-          output.position = vec4f(0.0, 0.0, 0.0, 0.0);
-          return output;
-      }
-
-      let tri_idx = v_idx / 3u;
-      let sub_idx = v_idx % 3u;
-
-      // ★ 整数座標を読み出し、NDC座標に変換
-      let center_pos = raw_to_ndc(all_vertices[cmd.vertex_base + cmd.index_base]);
-
-      let cam_center = (center_pos - uniforms.u_offset) * uniforms.u_zoom;
-      var final_pos = cam_center;
-
-      if (sub_idx > 0u) {
-          var vertex_on_ring = tri_idx;
-          if (sub_idx == 2u) {
-              vertex_on_ring = (tri_idx + 1u) % cmd.index_count;
-          }
-
-          let angle = (f32(vertex_on_ring) / f32(cmd.index_count)) * 2.0 * 3.14159265;
-          let raw_offset = vec2f(cos(angle), sin(angle));
-
-          let aspect = uniforms.u_res_x / uniforms.u_res_y;
-          let radius_ndc = (cmd.thickness * 0.5) / uniforms.u_res_y;
-
-          let offset = vec2f((raw_offset.x * radius_ndc) / aspect, raw_offset.y * radius_ndc);
-          final_pos = cam_center + offset;
-      }
-
-      output.position = vec4f(final_pos, 0.0, 1.0);
-      return output;
-  }
+  // 色などもプロパティから取得
+  output.color = prop.lineColor;
   return output;
 }
 

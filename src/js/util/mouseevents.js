@@ -1,23 +1,9 @@
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
 
-export default (
-  viewArray,
-  render,
-  updateUniforms,
-  updateUniforms2,
-  generateSceneData,
-) => {
+export default (viewArray) => {
   const canvas = document.getElementById("a");
   const devicePixelRatio = window.devicePixelRatio || 1;
-
-  // リサイズ時の更新対応
-  window.addEventListener("resize", () => {
-    canvas.width = window.innerWidth * devicePixelRatio;
-    canvas.height = window.innerHeight * devicePixelRatio;
-    updateUniforms2();
-    render();
-  });
 
   // ------------------------------------------
   // 7. マウス・ホイールイベントの追加
@@ -46,8 +32,9 @@ export default (
       viewArray[0] += mouseX / oldZoom - mouseX / viewArray[2];
       viewArray[1] += mouseY / oldZoom - mouseY / viewArray[2];
 
-      updateUniforms();
-      render(); // 再描画
+      viewArray[3] = 1;
+      // updateUniforms();
+      // render(); // 再描画
     },
     { passive: false },
   );
@@ -67,9 +54,10 @@ export default (
     const deltaY = e.clientY - previousMousePosition.y;
 
     // スクリーン移動量をNDC空間の移動量に変換
-    const ndcX = (deltaX / canvas.width) * (canvas.width / window.innerWidth);
+    const ndcX =
+      (deltaX / canvas.width) * 2 * (canvas.width / window.innerWidth);
     const ndcY =
-      -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
+      -(deltaY / canvas.height) * 2 * (canvas.height / window.innerHeight);
 
     // ズーム倍率に応じて移動量を調整
     viewArray[0] -= ndcX / viewArray[2];
@@ -77,8 +65,9 @@ export default (
 
     previousMousePosition = { x: e.clientX, y: e.clientY };
 
-    updateUniforms();
-    render();
+    viewArray[3] = 1;
+    // updateUniforms();
+    // render();
   });
 
   window.addEventListener("mouseup", () => {
@@ -132,9 +121,9 @@ export default (
         const deltaY = e.touches[0].clientY - previousMousePosition.y;
 
         const ndcX =
-          (deltaX / canvas.width) * (canvas.width / window.innerWidth);
+          (deltaX / canvas.width) * 2 * (canvas.width / window.innerWidth);
         const ndcY =
-          -(deltaY / canvas.height) * (canvas.height / window.innerHeight);
+          -(deltaY / canvas.height) * 2 * (canvas.height / window.innerHeight);
 
         viewArray[0] -= ndcX / viewArray[2];
         viewArray[1] -= ndcY / viewArray[2];
@@ -144,8 +133,9 @@ export default (
           y: e.touches[0].clientY,
         };
 
-        updateUniforms();
-        render();
+        viewArray[3] = 1;
+        // updateUniforms();
+        // render();
       } else if (e.touches.length === 2) {
         // 2本指：ピンチイン・アウト（中心位置固定の簡易ズーム）
         const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
@@ -153,9 +143,9 @@ export default (
           const factor = currentDistance / initialTouchDistance;
           viewArray[2] = initialZoom * factor;
           viewArray[2] = Math.max(0.1, Math.min(viewArray[2], 100.0)); // ズーム制限
-
-          updateUniforms();
-          render();
+          viewArray[3] = 1;
+          // updateUniforms();
+          // render();
         }
       }
     },
@@ -166,17 +156,5 @@ export default (
     e.preventDefault();
     isDragging = false;
     initialTouchDistance = 0;
-  });
-
-  // ------------------------------------------
-  // 9. ボタンクリック時の処理を追加（スクリプトの最末尾など）
-  // ------------------------------------------
-  document.getElementById("regenButton").addEventListener("click", () => {
-    // 1. 新しいランダムデータをJS側で生成
-    generateSceneData();
-    // 2. GPUへデータを上書き転送
-    // uploadDataToGPU();
-    // 3. 再描画
-    render();
   });
 };

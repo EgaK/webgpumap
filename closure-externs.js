@@ -57,3 +57,7 @@ var GPUShaderStage = {};
 GPUShaderStage.VERTEX;
 /** @type {number} */
 GPUShaderStage.FRAGMENT;
+/** @const */
+var GPUTextureUsage = {};
+/** @type {number} */
+GPUTextureUsage.RENDER_ATTACHMENT;

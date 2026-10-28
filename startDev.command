@@ -4,7 +4,7 @@ PROJECT_DIR=$(cd $(dirname $0);pwd)
 cd $PROJECT_DIR
 
 (
-    sleep 3; open -a 'Google Chrome' https://192.168.11.2/ &
+    open -a 'Google Chrome' https://192.168.11.2/ &
 ) &
 
     echo -e "\n開発環境スタート"

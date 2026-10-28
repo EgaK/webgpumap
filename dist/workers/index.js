@@ -3,6 +3,17 @@ import indexTemplate from "./template/index.html";
 
 const app = new Hono();
 
+app.get("/js/*", async (c) => {
+  const tile = await c.env.STATICS.fetch(c.req.url.replace("/js/", "/"));
+  return c.body(tile.body, tile.status, {
+    // 'Cache-Control': 'public, max-age=604800',
+    "Content-Type": "application/javascript",
+    "ETag": tile.headers.get("etag"),
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Embedder-Policy": "require-corp",
+  });
+});
+
 app.get("*", async (c) => {
   const lastmod = indexTemplate
     .match(/<meta[^>]*revised[^>]*>/)?.[0]

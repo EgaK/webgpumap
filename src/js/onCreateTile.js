@@ -1,59 +1,68 @@
 export default function onCreateTile(device, tileBindGroupLayout, tileData) {
-  // そのタイル固有のcommandBuffer（GPUバッファ）を作成・転送
-  const commandBuffer = device.createBuffer({
-    size: tileData.command.length * 48, // commandStructs は1要素48バイト
+  // そのタイル固有のpropertyBuffer（GPUバッファ）を作成・転送
+  const STRIDE = 48; // propStructs は1要素48バイト
+  const propertyBufferSize = tileData.propStructs.length * STRIDE;
+  const propertyBuffer = device.createBuffer({
+    size: propertyBufferSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
-  const vertexBuffer = device.createBuffer({
-    size: tileData.vertex.length * 4,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  const indexBuffer = device.createBuffer({
-    size: tileData.index.length * 4,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-
-  const STRIDE = 48;
-  const commandBufferSize = tileData.command.length * STRIDE;
-  const commandArrayBuffer = new ArrayBuffer(commandBufferSize);
-  const commandView = new DataView(commandArrayBuffer);
-
-  tileData.command.forEach((cmd, i) => {
+  const commandData = new Uint8Array(propertyBufferSize);
+  tileData.propStructs.forEach((cmd, i) => {
     const offset = i * STRIDE;
-    commandView.setFloat32(offset + 0, cmd.color[0], true);
-    commandView.setFloat32(offset + 4, cmd.color[1], true);
-    commandView.setFloat32(offset + 8, cmd.color[2], true);
-    commandView.setFloat32(offset + 12, cmd.color[3], true);
-    commandView.setFloat32(offset + 16, cmd.thickness, true);
-    commandView.setUint32(offset + 20, cmd.index_base, true);
-    commandView.setUint32(offset + 24, cmd.index_count, true);
-    commandView.setUint32(offset + 28, cmd.fig_type, true);
-    commandView.setUint32(offset + 32, cmd.vertex_base, true);
+    const buf1 = new Float32Array([
+      ...cmd.fillColor,
+      ...cmd.lineColor,
+      cmd.thickness,
+    ]);
+    const buf2 = new Uint32Array([
+      cmd.index_base,
+      cmd.index_count,
+      cmd.vertex_base,
+    ]);
+    commandData.set(new Uint8Array(buf1.buffer), offset);
+    commandData.set(new Uint8Array(buf2.buffer), offset + 36);
   });
-  device.queue.writeBuffer(commandBuffer, 0, commandArrayBuffer);
+  device.queue.writeBuffer(propertyBuffer, 0, commandData);
 
-  const vertexData = new Uint32Array(tileData.vertex);
-  const indexData = new Uint32Array(tileData.index);
-
+  const vertexBuffer = device.createBuffer({
+    size: tileData.allVertex.length * 8,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  const vertexData = new Uint32Array(tileData.allVertex);
   device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-  device.queue.writeBuffer(indexBuffer, 0, indexData);
 
+  const polygonIndexBuffer = device.createBuffer({
+    size: tileData.polygonIndex.length * 4,
+    usage:
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
+  });
+  const polygonIndexData = new Uint32Array(tileData.polygonIndex);
+  device.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
+
+  const borderIndexBuffer = device.createBuffer({
+    size: tileData.borderIndex.length * 4,
+    usage:
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
+  });
+  const borderIndexData = new Uint32Array(tileData.borderIndex);
+  device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
   // そのタイル固有のBindGroup（グループ1の実体）を作成
+
   const bindGroup = device.createBindGroup({
     layout: tileBindGroupLayout, // グループ1の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: commandBuffer } }, // タイル個別のバッファを紐付け
+      { binding: 0, resource: { buffer: propertyBuffer } }, // タイル個別のバッファを紐付け
       { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
-      { binding: 2, resource: { buffer: indexBuffer } },
     ],
   });
 
   return {
-    commandBuffer,
-    vertexBuffer,
-    indexBuffer,
     bindGroup,
-    maxVerticesPerInstance: tileData.maxVerticesPerInstance,
-    comLen: tileData.command.length,
+    propStructs: tileData.propStructs,
+    propertyBuffer,
+    polygonIndexBuffer,
+    polygonIndexCount: tileData.polygonIndex.length,
+    borderIndexBuffer,
+    borderIndexCount: tileData.borderIndex.length,
   };
 }

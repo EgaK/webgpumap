@@ -4,3 +4,4 @@ tmp/
 dist/.wrangler/
 dist/.dev.vars
 dist/
+test/
