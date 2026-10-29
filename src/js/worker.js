@@ -176,6 +176,58 @@ async function init(canvas, size, viewArray) {
       count: 4, // ★パイプライン側でも4倍を明示
     },
   });
+  const linePipeline = device.createRenderPipeline({
+    // layout: "auto" の代わりに、2つの設計図を配列で渡す
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
+    }),
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vs_polyline",
+      buffers: [
+        {
+          arrayStride: 20,
+          stepMode: "vertex",
+          attributes: [
+            {
+              shaderLocation: 0,
+              offset: 0,
+              format: "uint32",
+            },
+            {
+              shaderLocation: 1,
+              offset: 4,
+              format: "uint32",
+            },
+            {
+              shaderLocation: 2,
+              offset: 8,
+              format: "float32x2",
+            },
+            {
+              shaderLocation: 3,
+              offset: 16,
+              format: "float32",
+            },
+          ],
+        },
+      ],
+    },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_main",
+      targets: [{ format: presentationFormat }],
+    },
+    primitive: { topology: "triangle-list" },
+    depthStencil: {
+      format: "depth24plus",
+      depthWriteEnabled: true, // ★通常通り深度を書き込む
+      depthCompare: "greater",
+    },
+    multisample: {
+      count: 4, // ★パイプライン側でも4倍を明示
+    },
+  });
 
   if (DEVELOP) {
     const compilationInfo = await shaderModule.getCompilationInfo();
@@ -207,7 +259,7 @@ async function init(canvas, size, viewArray) {
   // var tileData = await loadTile([15, 28191, 13180]);
   console.log("tileData", tileData);
   const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
-
+  console.log("tiles", visibleTiles);
   // ユニフォームバッファを更新する関数を作成
   function updateUniforms() {
     // 1. offsetとzoom, flagw（16バイト分）を、GPUバッファの先頭（オフセット0）に直接転送
@@ -287,6 +339,11 @@ async function init(canvas, size, viewArray) {
       renderPass.setPipeline(borderPipeline);
       renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
+      // ポリライン;
+      renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
+      renderPass.setPipeline(linePipeline);
+      renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
     }
 
     renderPass.end();

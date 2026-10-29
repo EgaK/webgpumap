@@ -1,6 +1,6 @@
 export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   // そのタイル固有のpropertyBuffer（GPUバッファ）を作成・転送
-  const STRIDE = 48; // propStructs は1要素48バイト
+  let STRIDE = 48; // propStructs は1要素48バイト
   const propertyBufferSize = tileData.propStructs.length * STRIDE;
   const propertyBuffer = device.createBuffer({
     size: propertyBufferSize,
@@ -26,34 +26,80 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
 
   const polygonVertexBuffer = device.createBuffer({
     size: tileData.polygonVertex.length * 8,
-    usage:
-      GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
   const polygonVertexData = new Uint32Array(tileData.polygonVertex);
   device.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
 
   const polygonIndexBuffer = device.createBuffer({
     size: tileData.polygonIndex.length * 4,
-    usage:
-      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
   });
   const polygonIndexData = new Uint32Array(tileData.polygonIndex);
   device.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
 
   const borderIndexBuffer = device.createBuffer({
     size: tileData.borderIndex.length * 4,
-    usage:
-      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
   });
   const borderIndexData = new Uint32Array(tileData.borderIndex);
   device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
-  // そのタイル固有のBindGroup（グループ1の実体）を作成
 
+  // const lineVertexBuffer = device.createBuffer({
+  //   size: new Float32Array(tileData.lineVertex).byteLength,
+  //   usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  // });
+  // const lineVertexData = new Float32Array(tileData.lineVertex);
+  // device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
+
+  //   const totalElements = tileData.lineVertex.length;
+  //   const uint32View = new Uint32Array(totalElements);
+  //   const float32View = new Float32Array(uint32View.buffer); // ★同じメモリを共有
+  //
+  //   for (let i = 0; i < totalElements; i++) {
+  //     const mod = i % 4;
+  //     if (mod === 0 || mod === 1) {
+  //       uint32View[i] = tileData.lineVertex[i]; // 整数として書き込み
+  //     } else {
+  //       float32View[i] = tileData.lineVertex[i]; // 浮動小数点として書き込み（同じ場所にビットをそのまま格納）
+  //     }
+  //   }
+  //
+  //   const lineVertexBuffer = device.createBuffer({
+  //     size: uint32View.byteLength,
+  //     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  //   });
+  //   device.queue.writeBuffer(lineVertexBuffer, 0, uint32View.buffer);
+
+  STRIDE = 20; // lineVertex は1要素16バイト
+  const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
+  const lineVertexBuffer = device.createBuffer({
+    size: lineVertexBufferSize,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+  const lineVertexData = new Uint8Array(lineVertexBufferSize);
+  tileData.lineVertex.forEach((vtx, i) => {
+    const offset = i * STRIDE;
+    const buf1 = new Uint32Array([vtx.combined, vtx.featureID]);
+    const buf2 = new Float32Array([...vtx.dir, vtx.is_right]);
+
+    lineVertexData.set(new Uint8Array(buf1.buffer), offset);
+    lineVertexData.set(new Uint8Array(buf2.buffer), offset + 8);
+  });
+  device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
+
+  const lineIndexBuffer = device.createBuffer({
+    size: tileData.lineIndex.length * 4,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+  });
+  const lineIndexData = new Uint32Array(tileData.lineIndex);
+  device.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
+
+  // そのタイル固有のBindGroup（グループ1の実体）を作成
   const bindGroup = device.createBindGroup({
     layout: tileBindGroupLayout, // グループ1の設計図を指定
     entries: [
       { binding: 0, resource: { buffer: propertyBuffer } }, // タイル個別のバッファを紐付け
-      // { binding: 1, resource: { buffer: vertexBuffer } }, // ⭐ 頂点バッファをここに紐付ける
     ],
   });
 
@@ -66,5 +112,8 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     polygonIndexCount: tileData.polygonIndex.length,
     borderIndexBuffer,
     borderIndexCount: tileData.borderIndex.length,
+    lineVertexBuffer,
+    lineIndexBuffer,
+    lineIndexCount: tileData.lineIndex.length,
   };
 }
