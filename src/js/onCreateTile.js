@@ -14,13 +14,13 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
       ...cmd.lineColor,
       cmd.thickness,
     ]);
-    const buf2 = new Uint32Array([
-      cmd.index_base,
-      cmd.index_count,
-      cmd.vertex_base,
-    ]);
+    // const buf2 = new Uint32Array([
+    //   cmd.index_base,
+    //   cmd.index_count,
+    //   cmd.vertex_base,
+    // ]);
     commandData.set(new Uint8Array(buf1.buffer), offset);
-    commandData.set(new Uint8Array(buf2.buffer), offset + 36);
+    // commandData.set(new Uint8Array(buf2.buffer), offset + 36);
   });
   device.queue.writeBuffer(propertyBuffer, 0, commandData);
 
@@ -71,7 +71,7 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   //   });
   //   device.queue.writeBuffer(lineVertexBuffer, 0, uint32View.buffer);
 
-  STRIDE = 20; // lineVertex は1要素16バイト
+  STRIDE = 16; // lineVertex は1要素16バイト
   const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device.createBuffer({
     size: lineVertexBufferSize,
@@ -80,8 +80,9 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   const lineVertexData = new Uint8Array(lineVertexBufferSize);
   tileData.lineVertex.forEach((vtx, i) => {
     const offset = i * STRIDE;
-    const buf1 = new Uint32Array([vtx.combined, vtx.featureID]);
-    const buf2 = new Float32Array([...vtx.dir, vtx.is_right]);
+    const buf1 = new Uint32Array([vtx.packed, vtx.featureID]);
+    // const buf2 = new Float32Array([...vtx.dir, vtx.is_right]);
+    const buf2 = new Float32Array(vtx.normal);
 
     lineVertexData.set(new Uint8Array(buf1.buffer), offset);
     lineVertexData.set(new Uint8Array(buf2.buffer), offset + 8);

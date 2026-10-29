@@ -13,12 +13,12 @@ viewArray[3] = 1; // フラグ用 (0.0 = 変化なし, 1.0 = 変化あり)
 
 const canvas = $("canvas");
 canvas[0].width = 800;
-canvas[0].height = 800;
-canvas.css({ width: 400 + "px", height: 400 + "px" });
+canvas[0].height = 1200;
+canvas.css({ width: 400 + "px", height: 600 + "px" });
 const offcanvas = canvas[0].transferControlToOffscreen();
 
 const worker = new Worker("/js/worker.js");
-worker.postMessage({ "c": offcanvas, "s": [800, 800], "b": sab }, [offcanvas]);
+worker.postMessage({ "c": offcanvas, "s": [800, 1200], "b": sab }, [offcanvas]);
 
 // const canvas = document.getElementById("a");
 // const offcanvas = canvas.transferControlToOffscreen();

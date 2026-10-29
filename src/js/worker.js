@@ -186,7 +186,7 @@ async function init(canvas, size, viewArray) {
       entryPoint: "vs_polyline",
       buffers: [
         {
-          arrayStride: 20,
+          arrayStride: 16,
           stepMode: "vertex",
           attributes: [
             {
@@ -204,11 +204,11 @@ async function init(canvas, size, viewArray) {
               offset: 8,
               format: "float32x2",
             },
-            {
-              shaderLocation: 3,
-              offset: 16,
-              format: "float32",
-            },
+            // {
+            //   shaderLocation: 3,
+            //   offset: 16,
+            //   format: "float32",
+            // },
           ],
         },
       ],

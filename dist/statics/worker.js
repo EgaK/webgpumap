@@ -1,5 +1,5 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)line_dir:vec2f,@location(3)offset_sign:f32,}struct Property{fillColor:vec4f,lineColor:vec4f,thickness:f32,index_base:u32,index_count:u32,vertex_base:u32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=prop.fillColor;return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@vertex fn vs_polyline3(input:PolylineVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];output.color=prop.lineColor;let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let dir=normalize(vec2f(input.line_dir.x*aspect,input.line_dir.y));let normal=vec2f(-dir.y,dir.x);let thickness_ndc=30.0/uniforms.u_res_y;let offset=vec2f((normal.x*thickness_ndc*0.5)/aspect,normal.y*thickness_ndc*0.5)*input.offset_sign;let final_pos=cam_pos+offset;let z_val=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,0.5,1.0);return output;}@vertex fn vs_polyline0(input:PolylineVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@vertex fn vs_polyline1(input:PolylineVertex,@builtin(vertex_index)vertex_idx:u32)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let p0=raw_to_ndc(input.packed_pos);output.color=prop.lineColor;let is_right_side=f32(vertex_idx&1u);let side_sign=(is_right_side*2.0)-1.0;let dir=input.line_dir*side_sign;let half_thickness_pixels=prop.thickness*0.5;let resolution=vec2f(uniforms.u_res_x,uniforms.u_res_y);let offset_ndc=(dir*half_thickness_pixels)/resolution*2.0;var z=f32(input.feature_id)*1e-6+2e-7;var ndc_pos=vec4f(p0+offset_ndc,z,1.0);output.position=ndc_pos;return output;}@vertex fn vs_polyline(input:PolylineVertex,@builtin(vertex_index)v_idx:u32)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];output.color=prop.lineColor;let offset_sign=input.offset_sign;let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let dir=normalize(vec2f(input.line_dir.x*aspect,input.line_dir.y));let normal=vec2f(-dir.y,dir.x);let thickness_ndc=prop.thickness/uniforms.u_res_y;let offset=vec2f((normal.x*thickness_ndc*0.5)/aspect,normal.y*thickness_ndc*0.5)*offset_sign;let final_pos=cam_pos+offset;let z_val=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z_val,1.0);return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec4f,lineColor:vec4f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=prop.fillColor;return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=prop.thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=prop.lineColor;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
 
 // src/js/util/earcut.dev.js
 var steiners = /* @__PURE__ */ new Set();
@@ -565,8 +565,8 @@ async function generateSceneData() {
       for (let i2 = 0; i2 < ring.length; i2++) {
         const p = ring[i2];
         earcutRawData.push(p[0], p[1]);
-        const combined = (p[1] & 65535) << 16 | p[0] & 65535;
-        polygonVertex.push(combined, propStructs.length);
+        const packed = (p[1] & 65535) << 16 | p[0] & 65535;
+        polygonVertex.push(packed, propStructs.length);
         currentVertexCount++;
         borderIndex.push(borderIndexBase + i2);
         borderIndex.push(borderIndexBase + (i2 + 1 == ring.length ? 0 : i2 + 1));
@@ -581,10 +581,7 @@ async function generateSceneData() {
     propStructs.push({
       fillColor,
       lineColor,
-      thickness: strokeThickness,
-      index_base: polygonIndexBase,
-      index_count: indices.length,
-      vertex_base: polygonVertexBase
+      thickness: strokeThickness
     });
     polygonVertexBase += currentVertexCount;
     polygonIndexBase += indices.length;
@@ -592,66 +589,47 @@ async function generateSceneData() {
   function addPolyline(points, color, thickness) {
     const numPoints = points.length;
     if (numPoints < 2) return;
-    for (let i = 0; i < numPoints; i++) {
-      const p = points[i];
-      const current = i < numPoints - 1 ? points[i] : points[i];
-      const next = i < numPoints - 1 ? points[i + 1] : points[i - 1];
-      let dx = next[0] - current[0];
-      let dy = next[1] - current[1];
-      const len = Math.hypot(dx, dy) || 1;
-      const combined = (p[1] & 65535) << 16 | p[0] & 65535;
+    for (let i = 0; i < numPoints - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      const base = lineVertex.length;
+      const featureID = propStructs.length;
+      let packed = (current[1] & 65535) << 16 | current[0] & 65535;
+      const dx = next[0] - current[0];
+      const dy = -next[1] + current[1];
       lineVertex.push({
-        combined,
-        featureID: propStructs.length,
-        dir: [dx / len, dy / len],
-        is_right: -10
+        packed,
+        featureID,
+        normal: [dy, -dx]
       });
       lineVertex.push({
-        combined,
-        featureID: propStructs.length,
-        dir: [dx / len, dy / len],
-        is_right: 10
+        packed,
+        featureID,
+        normal: [-dy, dx]
       });
-      console.log(
-        `combined_x_y:${combined}, featureID:${propStructs.length}, dirX:${dx / len}, dirY:${dy / len}`
-      );
-      if (i < numPoints - 1) {
-        const i0 = lineIndexBase + i;
-        const i1 = lineIndexBase + i + 1;
-        const left0 = i0 * 2;
-        const right0 = i0 * 2 + 1;
-        const left1 = i1 * 2;
-        const right1 = i1 * 2 + 1;
-        lineIndex.push(left0, right0, left1);
-        lineIndex.push(right0, right1, left1);
+      packed = (next[1] & 65535) << 16 | next[0] & 65535;
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [-dy, dx]
+      });
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [dy, -dx]
+      });
+      lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
+      if (i > 0) {
+        lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
       }
     }
     propStructs.push({
       fillColor: [1, 1, 1, 0],
       lineColor: color,
-      thickness,
-      index_base: lineIndexBase,
-      index_count: points.length,
-      vertex_base: lineVertexBase
+      thickness
     });
-    lineIndexBase += numPoints * 6;
-    lineVertexBase += numPoints;
   }
-  function addPolyline2(points, color, thickness) {
-    for (const p of points) {
-      const combined = (p[1] & 65535) << 16 | p[0] & 65535;
-      polygonVertex.push(combined);
-    }
-    propStructs.push({
-      color,
-      thickness,
-      index_base: lineIndexBase,
-      index_count: points.length,
-      vertex_base: lineVertexBase
-    });
-    polygonVertexBase += points.length;
-  }
-  const NUM_POLYGONS = 1;
+  const NUM_POLYGONS = 5;
   const NUM_LINES = 0;
   for (let i = 0; i < NUM_POLYGONS; i++) {
     const cx = Math.random() * 4096;
@@ -707,14 +685,16 @@ async function generateSceneData() {
   }
   addPolyline(
     [
+      [500, 800],
       [1e3, 1e3],
       [1e3, 2e3],
       [2e3, 2e3],
       [2e3, 3e3],
-      [3e3, 3e3]
+      [3e3, 3e3],
+      [3500, 3600]
     ],
     [1, 0, 0, 1],
-    50
+    100
   );
   return {
     propStructs,
@@ -742,13 +722,7 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
       ...cmd.lineColor,
       cmd.thickness
     ]);
-    const buf2 = new Uint32Array([
-      cmd.index_base,
-      cmd.index_count,
-      cmd.vertex_base
-    ]);
     commandData.set(new Uint8Array(buf1.buffer), offset);
-    commandData.set(new Uint8Array(buf2.buffer), offset + 36);
   });
   device.queue.writeBuffer(propertyBuffer, 0, commandData);
   const polygonVertexBuffer = device.createBuffer({
@@ -769,7 +743,7 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
   });
   const borderIndexData = new Uint32Array(tileData.borderIndex);
   device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
-  STRIDE = 20;
+  STRIDE = 16;
   const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device.createBuffer({
     size: lineVertexBufferSize,
@@ -778,8 +752,8 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
   const lineVertexData = new Uint8Array(lineVertexBufferSize);
   tileData.lineVertex.forEach((vtx, i) => {
     const offset = i * STRIDE;
-    const buf1 = new Uint32Array([vtx.combined, vtx.featureID]);
-    const buf2 = new Float32Array([...vtx.dir, vtx.is_right]);
+    const buf1 = new Uint32Array([vtx.packed, vtx.featureID]);
+    const buf2 = new Float32Array(vtx.normal);
     lineVertexData.set(new Uint8Array(buf1.buffer), offset);
     lineVertexData.set(new Uint8Array(buf2.buffer), offset + 8);
   });
@@ -1757,7 +1731,7 @@ async function init(canvas, size, viewArray) {
       entryPoint: "vs_polyline",
       buffers: [
         {
-          arrayStride: 20,
+          arrayStride: 16,
           stepMode: "vertex",
           attributes: [
             {
@@ -1774,12 +1748,12 @@ async function init(canvas, size, viewArray) {
               shaderLocation: 2,
               offset: 8,
               format: "float32x2"
-            },
-            {
-              shaderLocation: 3,
-              offset: 16,
-              format: "float32"
             }
+            // {
+            //   shaderLocation: 3,
+            //   offset: 16,
+            //   format: "float32",
+            // },
           ]
         }
       ]

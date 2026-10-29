@@ -41,8 +41,8 @@ export default async function generateSceneData() {
         earcutRawData.push(p[0], p[1]);
 
         // GPUバッファ用（16ビットのバイナリを取り出してドッキング）
-        const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-        polygonVertex.push(combined, propStructs.length);
+        const packed = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
+        polygonVertex.push(packed, propStructs.length);
         currentVertexCount++;
 
         // 枠線（折れ線）用の処理
@@ -66,9 +66,6 @@ export default async function generateSceneData() {
       fillColor,
       lineColor,
       thickness: strokeThickness,
-      index_base: polygonIndexBase,
-      index_count: indices.length,
-      vertex_base: polygonVertexBase,
     });
 
     // グローバルなオフセットの更新
@@ -80,53 +77,45 @@ export default async function generateSceneData() {
     const numPoints = points.length;
     if (numPoints < 2) return;
 
-    for (let i = 0; i < numPoints; i++) {
-      const p = points[i];
-      const current = i < numPoints - 1 ? points[i] : points[i];
-      const next = i < numPoints - 1 ? points[i + 1] : points[i - 1];
-      // 方向ベクトル
-      let dx = next[0] - current[0];
-      let dy = next[1] - current[1];
-      const len = Math.hypot(dx, dy) || 1.0;
+    for (let i = 0; i < numPoints - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      const base = lineVertex.length;
 
-      const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-      // lineVertex.push(combined, propStructs.length, dx / len, dy / len);
-      // lineVertex.push(combined, propStructs.length, dx / len, dy / len);
+      const featureID = propStructs.length;
+      let packed = ((current[1] & 0xffff) << 16) | (current[0] & 0xffff);
+      const dx = next[0] - current[0];
+      // GPU側の座標に合わせて符号を反転しておく
+      const dy = -next[1] + current[1];
+      // const len = Math.hypot(dx, dy) || 1.0;
+
       lineVertex.push({
-        combined,
-        featureID: propStructs.length,
-        dir: [dx / len, dy / len],
-        is_right: -10.0,
+        packed,
+        featureID,
+        normal: [dy, -dx],
       });
       lineVertex.push({
-        combined,
-        featureID: propStructs.length,
-        dir: [dx / len, dy / len],
-        is_right: 10.0,
+        packed,
+        featureID,
+        normal: [-dy, dx],
       });
-      // lineVertex.push({
-      //   combined,
-      //   featureID: propStructs.length,
-      //   dir: [dx / len, dy / len],
-      // });
-      console.log(
-        `combined_x_y:${combined}, featureID:${propStructs.length}, dirX:${dx / len}, dirY:${dy / len}`,
-      );
 
-      if (i < numPoints - 1) {
-        const i0 = lineIndexBase + i; // 現在の点のインデックス
-        const i1 = lineIndexBase + i + 1; // 次の点のインデックス
+      packed = ((next[1] & 0xffff) << 16) | (next[0] & 0xffff);
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [-dy, dx],
+      });
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [dy, -dx],
+      });
 
-        // シェーダー内では1つのインデックスが2倍（左・右）に展開されると想定
-        const left0 = i0 * 2;
-        const right0 = i0 * 2 + 1;
-        const left1 = i1 * 2;
-        const right1 = i1 * 2 + 1;
+      lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
 
-        // 長方形を構成する2つの三角形（計6頂点）を登録
-        // lineIndex.push(left0, right0, left1, right0, right1, left1);
-        lineIndex.push(left0, right0, left1);
-        lineIndex.push(right0, right1, left1);
+      if (i > 0) {
+        lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
       }
     }
 
@@ -134,46 +123,11 @@ export default async function generateSceneData() {
       fillColor: [1, 1, 1, 0],
       lineColor: color,
       thickness: thickness,
-      index_base: lineIndexBase,
-      index_count: points.length,
-      vertex_base: lineVertexBase,
     });
-
-    lineIndexBase += numPoints * 6;
-    lineVertexBase += numPoints;
-  }
-
-  // ヘルパー：折れ線追加
-  function addPolyline2(points, color, thickness) {
-    for (const p of points) {
-      const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-      polygonVertex.push(combined);
-    }
-    propStructs.push({
-      color: color,
-      thickness: thickness,
-      index_base: lineIndexBase,
-      index_count: points.length,
-      vertex_base: lineVertexBase,
-    });
-
-    // 各頂点に関節用の「丸」を追加
-    // for (let i = 0; i < points.length; i++) {
-    //   propStructs.push({
-    //     color: color,
-    //     thickness: thickness,
-    //     index_base: i,
-    //     index_count: 32, // 分割数32で固定
-    //     fig_type: 2,
-    //     vertex_base: polygonVertexBase,
-    //   });
-    // }
-
-    polygonVertexBase += points.length;
   }
 
   // --- データのランダム自動生成 (5000個ずつの例) ---
-  const NUM_POLYGONS = 1;
+  const NUM_POLYGONS = 5;
   const NUM_LINES = 0;
 
   for (let i = 0; i < NUM_POLYGONS; i++) {
@@ -243,15 +197,40 @@ export default async function generateSceneData() {
 
   addPolyline(
     [
+      [500, 800],
       [1000, 1000],
       [1000, 2000],
       [2000, 2000],
       [2000, 3000],
       [3000, 3000],
+      [3500, 3600],
     ],
     [1, 0, 0, 1],
-    50.0,
+    100.0,
   );
+
+  // const points = [
+  //   [1000, 1000],
+  //   [1000, 2000],
+  //   [2000, 2000],
+  //   [2000, 1000],
+  // ];
+  // const extent = [
+  //   [0, 0],
+  //   [0, -0.3],
+  //   [0.1, 0],
+  //   [-0.05, 0.05],
+  // ];
+  // for (let i = 0; i < points.length; i++) {
+  //   const p = points[i];
+  //   const packed = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
+  //   lineVertex.push({
+  //     packed,
+  //     featureID: 1.0,
+  //     normal: extent[i],
+  //   });
+  // }
+  // lineIndex = [0, 1, 2, 0, 2, 3];
 
   return {
     propStructs,
