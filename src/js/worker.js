@@ -2,6 +2,7 @@ import shaderCode from "./shader.wgsl";
 import generateSceneData from "./generateSene";
 import onCreateTile from "./onCreateTile";
 import loadTile from "./loadTile";
+import style from "./style";
 
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -69,6 +70,16 @@ async function init(canvas, size, viewArray) {
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
       },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        texture: { sampleType: "float", viewDimension: "2d" },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.VERTEX,
+        sampler: { type: "filtering" },
+      }, // ★サンプラーの枠
     ],
   });
 
@@ -238,6 +249,76 @@ async function init(canvas, size, viewArray) {
     }
   }
 
+  const interpolate = (zoom, table) => {
+    if (zoom <= table[0][0]) return table[0][1];
+    if (zoom >= table[table.length - 1][0]) return table[table.length - 1][1];
+    for (let i = 0; i < table.length - 1; i++) {
+      const p0 = table[i],
+        p1 = table[i + 1];
+      if (zoom >= p0[0] && zoom <= p1[0]) {
+        const t = (zoom - p0[0]) / (p1[0] - p0[0]);
+        return p0[1] + (p1[1] - p0[1]) * t; // 線形補間
+      }
+    }
+    return table[0][1];
+  };
+
+  let styleTable = [];
+  for (const s of style) {
+    if (Array.isArray(s.thickness)) {
+      styleTable.push({
+        thickness: s.thickness,
+      });
+      s.thickness = -styleTable.length;
+    }
+  }
+
+  const texWidth = 32;
+  const texHeight = 4; // 本来はstyleTable.length
+  const textureData = new Float16Array(texWidth * texHeight * 4);
+  const minZoom = 0.0;
+  const maxZoom = 20.0;
+
+  for (let tableId = 0; tableId < texHeight; tableId++) {
+    const thicknessTable = styleTable[tableId]?.thickness;
+    if (!thicknessTable) break;
+    // const opacityTable = getOpacityTableForId(tableId);
+
+    for (let i = 0; i < texWidth; i++) {
+      const t = i / (texWidth - 1); // 0.0 〜 1.0
+      const targetZoom = minZoom + t * (maxZoom - minZoom);
+
+      const pixelIdx = (tableId * texWidth + i) * 4;
+      textureData[pixelIdx + 0] = interpolate(targetZoom, thicknessTable);
+      textureData[pixelIdx + 1] = 0; // interpolate(targetZoom, opacityTable);
+      textureData[pixelIdx + 2] = 0.0;
+      textureData[pixelIdx + 3] = 1.0;
+    }
+  }
+
+  // WebGPU 2Dテクスチャの作成
+  const styleTexture2D = device.createTexture({
+    size: [texWidth, texHeight, 1], // 高さを 16 に
+    dimension: "2d", // 2d に変更
+    format: "rgba16float",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+
+  // データの転送
+  device.queue.writeTexture(
+    { texture: styleTexture2D },
+    textureData,
+    { bytesPerRow: texWidth * 8 }, // ★ 幅16 * 8バイト = 128バイト
+    [texWidth, texHeight, 1],
+  );
+
+  // 2. バイリニア（線形）補間を行うサンプラーの作成（★ここが最重要！）
+  const linearSampler = device.createSampler({
+    magFilter: "linear",
+    minFilter: "linear",
+    addressModeU: "clamp-to-edge", // 範囲外(0未満や1超)のズームは端点の色を固定
+  });
+
   const uniformBuffer = device.createBuffer({
     size: 32,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -251,6 +332,8 @@ async function init(canvas, size, viewArray) {
     layout: commonBindGroupLayout, // グループ0の設計図を指定
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } }, // 実体バッファ
+      { binding: 1, resource: styleTexture2D.createView() },
+      { binding: 2, resource: linearSampler }, // ★ここで使用します！
     ],
   });
 

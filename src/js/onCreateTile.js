@@ -6,7 +6,7 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     size: propertyBufferSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
-  const commandData = new Uint8Array(propertyBufferSize);
+  const propertyData = new Uint8Array(propertyBufferSize);
   tileData.propStructs.forEach((cmd, i) => {
     const offset = i * STRIDE;
     const buf1 = new Float32Array([
@@ -19,10 +19,10 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     //   cmd.index_count,
     //   cmd.vertex_base,
     // ]);
-    commandData.set(new Uint8Array(buf1.buffer), offset);
-    // commandData.set(new Uint8Array(buf2.buffer), offset + 36);
+    propertyData.set(new Uint8Array(buf1.buffer), offset);
+    // propertyData.set(new Uint8Array(buf2.buffer), offset + 36);
   });
-  device.queue.writeBuffer(propertyBuffer, 0, commandData);
+  device.queue.writeBuffer(propertyBuffer, 0, propertyData);
 
   const polygonVertexBuffer = device.createBuffer({
     size: tileData.polygonVertex.length * 8,

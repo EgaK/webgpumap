@@ -1,5 +1,5 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec4f,lineColor:vec4f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=prop.fillColor;return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=prop.thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=prop.lineColor;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec4f,lineColor:vec4f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var zoom_texture_2d:texture_2d<f32>;@group(0)@binding(2)var linear_sampler:sampler;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=prop.fillColor;return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var thickness=prop.thickness;if(thickness<0){let v_coord=(-thickness-0.5)/4.0;let uv=vec2f(uniforms.u_zoom/10,v_coord);let sampled_data=textureSampleLevel(zoom_texture_2d,linear_sampler,uv,0.0);thickness=sampled_data.r;}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=prop.lineColor;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
 
 // src/js/util/earcut.dev.js
 var steiners = /* @__PURE__ */ new Set();
@@ -547,7 +547,7 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
     size: propertyBufferSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
   });
-  const commandData = new Uint8Array(propertyBufferSize);
+  const propertyData = new Uint8Array(propertyBufferSize);
   tileData.propStructs.forEach((cmd, i) => {
     const offset = i * STRIDE;
     const buf1 = new Float32Array([
@@ -555,9 +555,9 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
       ...cmd.lineColor,
       cmd.thickness
     ]);
-    commandData.set(new Uint8Array(buf1.buffer), offset);
+    propertyData.set(new Uint8Array(buf1.buffer), offset);
   });
-  device.queue.writeBuffer(propertyBuffer, 0, commandData);
+  device.queue.writeBuffer(propertyBuffer, 0, propertyData);
   const polygonVertexBuffer = device.createBuffer({
     size: tileData.polygonVertex.length * 8,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
@@ -1483,8 +1483,8 @@ var style_default = [
     //"150,150,150",
     // Color: '969696',
     thickness: [
-      [10, 3],
-      [15, 5]
+      [10, 30],
+      [15, 100]
     ]
     // thickness: 5,
     // Dash: [30, 30],
@@ -1685,6 +1685,7 @@ var style_default = [
 
 // src/js/loadTile.js
 var loadTile_default = async (zxy) => {
+  console.log("style on loadTile:", style_default);
   let propStructs = [];
   let polygonVertex = [];
   let polygonVertexBase = 0;
@@ -1725,9 +1726,7 @@ var loadTile_default = async (zxy) => {
     return sum < 0;
   }
   function processMVTLayer(layer2, prop) {
-    var strokeThickness = prop.thickness;
-    console.log("thikness", strokeThickness);
-    strokeThickness = Array.isArray(strokeThickness) ? 30 : strokeThickness ? strokeThickness : 0;
+    var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
       var fillColor = prop.Color;
       var strokeColor = [0.3, 0.3, 0.3, 1];
@@ -1909,7 +1908,18 @@ async function init(canvas, size, viewArray) {
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }
         // Uniformバッファが入りますよという宣言
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        texture: { sampleType: "float", viewDimension: "2d" }
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.VERTEX,
+        sampler: { type: "filtering" }
       }
+      // ★サンプラーの枠
     ]
   });
   const tileBindGroupLayout = device.createBindGroupLayout({
@@ -2079,6 +2089,66 @@ async function init(canvas, size, viewArray) {
       );
     }
   }
+  const interpolate = (zoom, table) => {
+    if (zoom <= table[0][0]) return table[0][1];
+    if (zoom >= table[table.length - 1][0]) return table[table.length - 1][1];
+    for (let i = 0; i < table.length - 1; i++) {
+      const p0 = table[i], p1 = table[i + 1];
+      if (zoom >= p0[0] && zoom <= p1[0]) {
+        const t = (zoom - p0[0]) / (p1[0] - p0[0]);
+        return p0[1] + (p1[1] - p0[1]) * t;
+      }
+    }
+    return table[0][1];
+  };
+  let styleTable = [];
+  for (const s of style_default) {
+    if (Array.isArray(s.thickness)) {
+      styleTable.push({
+        thickness: s.thickness
+      });
+      s.thickness = -styleTable.length;
+    }
+  }
+  const texWidth = 32;
+  const texHeight = 4;
+  const textureData = new Float16Array(texWidth * texHeight * 4);
+  const minZoom = 0;
+  const maxZoom = 20;
+  for (let tableId = 0; tableId < texHeight; tableId++) {
+    const thicknessTable = styleTable[tableId]?.thickness;
+    if (!thicknessTable) break;
+    for (let i = 0; i < texWidth; i++) {
+      const t = i / (texWidth - 1);
+      const targetZoom = minZoom + t * (maxZoom - minZoom);
+      const pixelIdx = (tableId * texWidth + i) * 4;
+      textureData[pixelIdx + 0] = interpolate(targetZoom, thicknessTable);
+      textureData[pixelIdx + 1] = 0;
+      textureData[pixelIdx + 2] = 0;
+      textureData[pixelIdx + 3] = 1;
+    }
+  }
+  const styleTexture2D = device.createTexture({
+    size: [texWidth, texHeight, 1],
+    // 高さを 16 に
+    dimension: "2d",
+    // 2d に変更
+    format: "rgba16float",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+  });
+  device.queue.writeTexture(
+    { texture: styleTexture2D },
+    textureData,
+    { bytesPerRow: texWidth * 8 },
+    // ★ 幅16 * 8バイト = 128バイト
+    [texWidth, texHeight, 1]
+  );
+  const linearSampler = device.createSampler({
+    magFilter: "linear",
+    minFilter: "linear",
+    addressModeU: "clamp-to-edge"
+    // 範囲外(0未満や1超)のズームは端点の色を固定
+  });
   const uniformBuffer = device.createBuffer({
     size: 32,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
@@ -2087,8 +2157,11 @@ async function init(canvas, size, viewArray) {
     layout: commonBindGroupLayout,
     // グループ0の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } }
+      { binding: 0, resource: { buffer: uniformBuffer } },
       // 実体バッファ
+      { binding: 1, resource: styleTexture2D.createView() },
+      { binding: 2, resource: linearSampler }
+      // ★ここで使用します！
     ]
   });
   var tileData = await loadTile_default([15, 28191, 13180]);

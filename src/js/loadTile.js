@@ -5,6 +5,7 @@ import earcut from "./util/earcut.dev";
 import style from "./style";
 
 export default async (zxy) => {
+  console.log("style on loadTile:", style);
   let propStructs = [];
   let polygonVertex = [];
   let polygonVertexBase = 0;
@@ -57,13 +58,7 @@ export default async (zxy) => {
 
   // MVTレイヤーの全地物を処理するメインループ
   function processMVTLayer(layer, prop) {
-    var strokeThickness = prop.thickness;
-    console.log("thikness", strokeThickness);
-    strokeThickness = Array.isArray(strokeThickness)
-      ? 30
-      : strokeThickness
-        ? strokeThickness
-        : 0;
+    var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
       var fillColor = prop.Color;
       var strokeColor = [0.3, 0.3, 0.3, 1];

@@ -26,6 +26,9 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+@group(0) @binding(1) var zoom_texture_2d: texture_2d<f32>;
+@group(0) @binding(2) var linear_sampler: sampler; // ★JSの linearSampler と紐付く
+
 @group(1) @binding(0) var<storage, read> properties: array<Property>;
 // @group(1) @binding(1) var<storage, read> primitive_vertices: array<PrimitiveVertex>;
 
@@ -92,11 +95,19 @@ fn vs_polyline(
   let prop = properties[input.feature_id];
   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
 
+  var thickness = prop.thickness;
+  if　(thickness<0)　{
+    let v_coord = (-thickness - 0.5) / 4.0;
+    let uv = vec2f(uniforms.u_zoom/10, v_coord);
+    let sampled_data = textureSampleLevel(zoom_texture_2d, linear_sampler, uv, 0.0);
+    thickness = sampled_data.r;
+  }
+
   let aspect = uniforms.u_res_x / uniforms.u_res_y;
   let normal = normalize(vec2f(input.normal.x * aspect , input.normal.y));
 
   // 画面の縦解像度(u_res_x)を基準に、指定ピクセル幅（prop.thickness）の半分だけオフセット
-  let thickness_ndc = prop.thickness / uniforms.u_res_x;
+  let thickness_ndc = thickness / uniforms.u_res_x;
   let offset = vec2f(
     normal.x * thickness_ndc * 0.5 / aspect,
     normal.y * thickness_ndc * 0.5
@@ -110,59 +121,6 @@ fn vs_polyline(
   output.color = prop.lineColor;
   return output;
 }
-
-
-// @vertex
-// fn vs_polyline1(
-//   input: PolylineVertex,
-//   @builtin(vertex_index) v_idx: u32 // インデックスバッファの数字が1つずつ入る
-// ) -> VertexOutput {
-//   var output: VertexOutput;
-//
-//   // 1. 地物IDからプロパティ（色や太さ）を取得
-//   let prop = properties[input.feature_id];
-//   output.color = prop.lineColor; // 縁取りではなく独立したラインなのでlineColorを使用
-//   // output.color = vec4f(0.0,0.0,0.0,1.0);
-//
-//   // 2. 自分が「左(-1.0)」か「右(1.0)」のどちらに広がる頂点かを判定
-//   // インデックス(v_idx)が奇数なら 1.0（右）、偶数なら -1.0（左）
-//   // let offset_sign = f32(v_idx % 2u) * 2.0 - 1.0;
-//   let offset_sign = input.offset_sign; // -1.0（左）、1.0（右）
-//
-//   // 3. 元の座標をNDC空間からカメラ空間へ変換（ポリゴンと全く同じ処理）
-//   let ndc_pos = raw_to_ndc(input.packed_pos);
-//   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
-//
-//   // 4. アスペクト比を考慮して、スクリーン空間（ピクセル世界）での法線（直角の向き）を計算
-//   let aspect = uniforms.u_res_x / uniforms.u_res_y;
-//
-//   // 進行方向ベクトルをアスペクト比で補正してから90度回転させて法線を作る
-//   let dir = normalize(vec2f(input.line_dir.x * aspect, input.line_dir.y));
-//   let normal = vec2f(-dir.y, dir.x);
-//
-//   // 5. カメラがどれだけズームしても「常に一定のピクセル幅」に押し広げる計算
-//   // 画面の縦解像度(u_res_y)を基準に、指定ピクセル幅（prop.thickness）の半分だけオフセット
-//   let thickness_ndc = prop.thickness / uniforms.u_res_y;
-//   // let thickness_ndc = 30.0 / uniforms.u_res_y;
-//
-//   // 計算した直角方向(normal)に、太さと、左か右か(offset_sign)を掛け算し、アスペクト比を戻す
-//   let offset = vec2f(
-//     (normal.x * thickness_ndc * 0.5) / aspect,
-//     normal.y * thickness_ndc * 0.5
-//   ) * offset_sign;
-//
-//   // 6. 最終的な頂点座標（カメラ座標 ＋ 太らせたオフセット）
-//   let final_pos = cam_pos + offset;
-//
-//   // 7. 成功したポリゴンと同じ、1つ目(ID=0)が消えない安全なReversed-Z（重なり順）の計算
-//   let z_val = f32(input.feature_id + 1u) * 1e-6;
-//
-//   output.position = vec4f(final_pos, z_val, 1.0);
-//   // output.position = vec4f(cam_pos, 0.5, 1.0);
-//
-//   return output;
-// }
-
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4f {
