@@ -7,15 +7,12 @@ export default async function generateSceneData() {
   let polygonVertexBase = 0;
 
   let polygonIndex = [];
-  let polygonIndexBase = 0;
 
   let borderIndex = [];
   let borderIndexBase = 0;
 
   let lineVertex = []; // 幅付きライン専用の頂点配列
-  let lineVertexBase = 0;
   let lineIndex = []; // 幅付きライン専用のインデックス配列
-  let lineIndexBase = 0; // 全体を通した「元の点」のカウンター
 
   // ヘルパー：ポリゴン追加
   function addPolygon(rings, fillColor, lineColor, strokeThickness) {
@@ -25,6 +22,7 @@ export default async function generateSceneData() {
     const holeIndices = []; // 穴の開始位置（頂点単位のインデックス）を記録する配列
 
     let currentVertexCount = 0;
+    let base = 0;
 
     for (let i = 0; i < rings.length; i++) {
       const ring = rings[i];
@@ -70,7 +68,6 @@ export default async function generateSceneData() {
 
     // グローバルなオフセットの更新
     polygonVertexBase += currentVertexCount;
-    polygonIndexBase += indices.length;
   }
 
   function addPolyline(points, color, thickness) {
@@ -127,8 +124,8 @@ export default async function generateSceneData() {
   }
 
   // --- データのランダム自動生成 (5000個ずつの例) ---
-  const NUM_POLYGONS = 5;
-  const NUM_LINES = 0;
+  const NUM_POLYGONS = 10;
+  const NUM_LINES = 10;
 
   for (let i = 0; i < NUM_POLYGONS; i++) {
     const cx = Math.random() * 4096;
@@ -177,7 +174,7 @@ export default async function generateSceneData() {
 
   for (let i = 0; i < NUM_LINES; i++) {
     const points = [];
-    const numSegments = 5; // + Math.floor(Math.random() * 100);
+    const numSegments = 5 + Math.floor(Math.random() * 100);
     let sx = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
     let sy = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
     points.push([sx, sy]);
@@ -195,19 +192,19 @@ export default async function generateSceneData() {
     );
   }
 
-  addPolyline(
-    [
-      [500, 800],
-      [1000, 1000],
-      [1000, 2000],
-      [2000, 2000],
-      [2000, 3000],
-      [3000, 3000],
-      [3500, 3600],
-    ],
-    [1, 0, 0, 1],
-    100.0,
-  );
+  // addPolyline(
+  //   [
+  //     [500, 800],
+  //     [1000, 1000],
+  //     [1000, 2000],
+  //     [2000, 2000],
+  //     [2000, 3000],
+  //     [3000, 3000],
+  //     [3500, 3600],
+  //   ],
+  //   [1, 0, 0, 1],
+  //   100.0,
+  // );
 
   // const points = [
   //   [1000, 1000],

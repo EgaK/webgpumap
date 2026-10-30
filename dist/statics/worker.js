@@ -539,173 +539,6 @@ function signedArea(data, start, end, dim) {
   return sum;
 }
 
-// src/js/generateSene.js
-async function generateSceneData() {
-  let propStructs = [];
-  let polygonVertex = [];
-  let polygonVertexBase = 0;
-  let polygonIndex = [];
-  let polygonIndexBase = 0;
-  let borderIndex = [];
-  let borderIndexBase = 0;
-  let lineVertex = [];
-  let lineVertexBase = 0;
-  let lineIndex = [];
-  let lineIndexBase = 0;
-  function addPolygon(rings, fillColor, lineColor, strokeThickness) {
-    const earcutRawData = [];
-    const holeIndices = [];
-    let currentVertexCount = 0;
-    for (let i = 0; i < rings.length; i++) {
-      const ring = rings[i];
-      if (!ring.length) continue;
-      if (i > 0) {
-        holeIndices.push(currentVertexCount);
-      }
-      for (let i2 = 0; i2 < ring.length; i2++) {
-        const p = ring[i2];
-        earcutRawData.push(p[0], p[1]);
-        const packed = (p[1] & 65535) << 16 | p[0] & 65535;
-        polygonVertex.push(packed, propStructs.length);
-        currentVertexCount++;
-        borderIndex.push(borderIndexBase + i2);
-        borderIndex.push(borderIndexBase + (i2 + 1 == ring.length ? 0 : i2 + 1));
-      }
-      borderIndexBase += ring.length;
-    }
-    const indices = earcut(earcutRawData, holeIndices);
-    if (!indices.length) return;
-    indices.forEach((idx) => {
-      polygonIndex.push(polygonVertexBase + idx);
-    });
-    propStructs.push({
-      fillColor,
-      lineColor,
-      thickness: strokeThickness
-    });
-    polygonVertexBase += currentVertexCount;
-    polygonIndexBase += indices.length;
-  }
-  function addPolyline(points, color, thickness) {
-    const numPoints = points.length;
-    if (numPoints < 2) return;
-    for (let i = 0; i < numPoints - 1; i++) {
-      const current = points[i];
-      const next = points[i + 1];
-      const base = lineVertex.length;
-      const featureID = propStructs.length;
-      let packed = (current[1] & 65535) << 16 | current[0] & 65535;
-      const dx = next[0] - current[0];
-      const dy = -next[1] + current[1];
-      lineVertex.push({
-        packed,
-        featureID,
-        normal: [dy, -dx]
-      });
-      lineVertex.push({
-        packed,
-        featureID,
-        normal: [-dy, dx]
-      });
-      packed = (next[1] & 65535) << 16 | next[0] & 65535;
-      lineVertex.push({
-        packed,
-        featureID,
-        normal: [-dy, dx]
-      });
-      lineVertex.push({
-        packed,
-        featureID,
-        normal: [dy, -dx]
-      });
-      lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
-      if (i > 0) {
-        lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
-      }
-    }
-    propStructs.push({
-      fillColor: [1, 1, 1, 0],
-      lineColor: color,
-      thickness
-    });
-  }
-  const NUM_POLYGONS = 5;
-  const NUM_LINES = 0;
-  for (let i = 0; i < NUM_POLYGONS; i++) {
-    const cx = Math.random() * 4096;
-    const cy = Math.random() * 4096;
-    const size = 500 + Math.random() * 500;
-    const outerStar = [];
-    const innerHole = [];
-    const numPoints = 4 + Math.floor(Math.random() * 10);
-    for (let j = 0; j < numPoints * 2; j++) {
-      const angle = -(j / (numPoints * 2)) * Math.PI * 2;
-      const r = j % 2 === 0 ? size : size * 0.4;
-      const p = [~~(cx + Math.cos(angle) * r), ~~(cy + Math.sin(angle) * r)];
-      outerStar.push(p);
-    }
-    const holePoints = 5;
-    const holeSize = size * 0.25;
-    for (let j = 0; j < holePoints; j++) {
-      const angle = j / holePoints * Math.PI * 2;
-      const p = [
-        ~~(cx + Math.cos(angle) * holeSize),
-        ~~(cy + Math.sin(angle) * holeSize)
-      ];
-      innerHole.push(p);
-    }
-    const polygonRings = [outerStar, innerHole];
-    addPolygon(
-      polygonRings,
-      // 外周と穴を含んだ多重配列を渡す
-      // [0.9, 0.9, 0.9, 1],
-      [Math.random(), Math.random(), Math.random(), Math.random()],
-      [0, 0, 0, 1],
-      2 + Math.random() * 15
-    );
-  }
-  for (let i = 0; i < NUM_LINES; i++) {
-    const points = [];
-    const numSegments = 5;
-    let sx = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
-    let sy = ~~((Math.random() * 2 - 1) * 0.9 * 2048 + 2048);
-    points.push([sx, sy]);
-    for (let j = 0; j < numSegments; j++) {
-      sx += ~~(Math.random() * 200 - 100);
-      sy += ~~(Math.random() * 200 - 100);
-      sx = sx >= 4096 ? 4096 : sx < 0 ? 0 : sx;
-      sy = sy >= 4096 ? 4096 : sy < 0 ? 0 : sy;
-      points.push([sx, sy]);
-    }
-    addPolyline(
-      points,
-      [Math.random(), Math.random(), Math.random(), Math.random()],
-      2 + Math.random() * 15
-    );
-  }
-  addPolyline(
-    [
-      [500, 800],
-      [1e3, 1e3],
-      [1e3, 2e3],
-      [2e3, 2e3],
-      [2e3, 3e3],
-      [3e3, 3e3],
-      [3500, 3600]
-    ],
-    [1, 0, 0, 1],
-    100
-  );
-  return {
-    propStructs,
-    polygonVertex,
-    polygonIndex,
-    borderIndex,
-    lineVertex,
-    lineIndex
-  };
-}
-
 // src/js/onCreateTile.js
 function onCreateTile(device, tileBindGroupLayout, tileData) {
   let STRIDE = 48;
@@ -1263,6 +1096,84 @@ function signedArea2(ring) {
   }
   return sum;
 }
+var VectorTileLayer = class {
+  /**
+   * @param {PbfReader} pbf
+   * @param {number} [end]
+   */
+  constructor(pbf, end) {
+    this.version = 1;
+    this.name = "";
+    this.extent = 4096;
+    this.length = 0;
+    this._pbf = pbf;
+    this._keys = [];
+    this._values = [];
+    this._features = [];
+    if (end === void 0) end = pbf.length;
+    while (pbf.pos < end) {
+      const tag = pbf.readVarint();
+      if (tag === 10) this.name = pbf.readString();
+      else if (tag === 18) {
+        this._features.push(pbf.pos);
+        pbf.skip(tag);
+      } else if (tag === 26) this._keys.push(pbf.readString());
+      else if (tag === 34) this._values.push(readValueMessage(pbf));
+      else if (tag === 40) this.extent = pbf.readVarint();
+      else if (tag === 120) this.version = pbf.readVarint();
+      else pbf.skip(tag);
+    }
+    this.length = this._features.length;
+  }
+  /** return feature `i` from this layer as a `VectorTileFeature`
+   * @param {number} i
+   */
+  feature(i) {
+    if (i < 0 || i >= this._features.length) {
+      console.log("feature index out of bounds");
+      return;
+    }
+    this._pbf.pos = this._features[i];
+    const end = this._pbf.readVarint() + this._pbf.pos;
+    return new VectorTileFeature(
+      this._pbf,
+      end,
+      this.extent,
+      this._keys,
+      this._values
+    );
+  }
+};
+function readValueMessage(pbf) {
+  let value = null;
+  const end = pbf.readVarint() + pbf.pos;
+  while (pbf.pos < end) {
+    const tag = pbf.readVarint();
+    value = tag === 10 ? pbf.readString() : tag === 21 ? pbf.readFloat() : tag === 25 ? pbf.readDouble() : tag === 32 ? pbf.readVarint(true) : tag === 40 ? pbf.readVarint() : tag === 48 ? pbf.readSVarint() : tag === 56 ? pbf.readBoolean() : (pbf.skip(tag), null);
+  }
+  if (value == null) {
+    console.log("unknown feature value");
+    return;
+  }
+  return value;
+}
+var VectorTile = class {
+  /**
+   * @param {PbfReader} pbf
+   * @param {number} [end]
+   */
+  constructor(pbf, end = pbf.length) {
+    const layers = /* @__PURE__ */ Object.create(null);
+    while (pbf.pos < end) {
+      const tag = pbf.readVarint();
+      if (tag === 26) {
+        const layer = new VectorTileLayer(pbf, pbf.readVarint() + pbf.pos);
+        if (layer.length) layers[layer.name] = layer;
+      } else pbf.skip(tag);
+    }
+    this.layers = layers;
+  }
+};
 
 // src/js/pbf/ieee754.js
 var read = (buffer, offset, isLE, mLen, nBytes) => {
@@ -1562,6 +1473,391 @@ var readUtf8 = (buf, pos, end) => {
   return str;
 };
 
+// src/js/style.js
+var style_default = [
+  {
+    // 鉄道
+    Type: "l",
+    Layer: "t",
+    Color: [0.59, 0.59, 0.59, 1],
+    //"150,150,150",
+    // Color: '969696',
+    thickness: [
+      [10, 3],
+      [15, 5]
+    ]
+    // thickness: 5,
+    // Dash: [30, 30],
+    // thickness: [
+    // 	[10, 3],
+    // 	[15, 20],
+    // ],
+  },
+  {
+    // 建物
+    Type: "f",
+    Layer: "b",
+    Color: [0.94, 0.96, 0.94, 1],
+    //"240,245,240",
+    // Color: 'f0f5f0',
+    // Color: '200,200,200',
+    // thickness: 1,
+    thickness: 1
+    // OPacity: .5,
+  },
+  {
+    // 道路輪郭
+    Type: "l",
+    Layer: "r1",
+    Color: [0.39, 0.39, 0.39, 1],
+    //"99,99,99",
+    // Color: '636363',
+    thickness: 1,
+    OPacity: [
+      [16, 0],
+      [18, 1]
+    ]
+  },
+  {
+    // 道路部品
+    Type: "l",
+    Layer: "r2",
+    Color: [0.77, 0.63, 0, 1],
+    //"196,160,0",
+    // Color: 'c4a000',
+    thickness: 1,
+    OPacity: [
+      [16, 0],
+      [17, 1]
+    ]
+  },
+  {
+    // その他の道路
+    Type: "f",
+    Layer: "r5",
+    Color: [1, 1, 1, 1]
+    // Color: 'ffffff',
+  },
+  {
+    // 高速
+    Type: "f",
+    Layer: "r3",
+    Color: [1, 0.77, 0.6, 1]
+    //"255,197,153",
+    // Color: 'ffc599',
+  },
+  {
+    // 高速 // Zoom13以下のとき
+    Type: "l",
+    Layer: "r8",
+    Color: [1, 0.77, 0.6, 1],
+    //"255,197,153",
+    // Color: 'ffc599',
+    // thickness: 1,
+    // OPacity: [
+    // 	[10, 0],
+    // 	[12, 1],
+    // ],
+    thickness: [
+      [10, 5],
+      [13, 10]
+    ]
+  },
+  {
+    // 国道
+    Type: "f",
+    Layer: "r4",
+    Color: [0.93, 0.86, 0.58, 1]
+    //"239,220,148",
+    // Color: 'efdc94',
+  },
+  {
+    // 国道 // Zoom13以下のとき
+    Type: "l",
+    Layer: "r9",
+    Color: [0.93, 0.86, 0.58, 1],
+    //"239,220,148",
+    // Color: 'efdc94',
+    // thickness: 1,
+    // OPacity: [
+    // 	[10, 0],
+    // 	[12, 1],
+    // ],
+    thickness: [
+      [10, 5],
+      [13, 10],
+      [16, 30]
+    ]
+  },
+  {
+    // トンネル
+    Type: "l",
+    Layer: "r6",
+    Color: [0.39, 0.39, 0.39],
+    //"100,100,100",
+    // Color: '646464',
+    thickness: 2,
+    Dash: [20, 20]
+  },
+  {
+    // 水域
+    Type: "f",
+    Layer: "w",
+    Color: [0.66, 0.86, 1, 1]
+    //"170,221,255",
+    // Color: 'aaddff',
+  },
+  {
+    // 緑
+    Type: "f",
+    Layer: "g",
+    Color: [0.8, 0.93, 0.66, 1]
+    //"204,238,170",
+    // Color: 'cceeaa',
+  },
+  // 文字用のレイヤ
+  {
+    Type: "p",
+    Layer: "c",
+    // text: "name",
+    Color: [0.4, 0.4, 0.4, 1],
+    //"102,102,102",
+    // Color: '666666',
+    Size: 14,
+    Padding: 10
+    // Css: {
+    // 	"border-radius": "4px",
+    // 	"background": "rgba(255,255,255,.5)",
+    // 	"padding": "5px",
+    // 	"font": "14px bold gothic",
+    // 	"color": "#333",
+    // }
+  },
+  {
+    // 道路の文字
+    Type: "p",
+    Layer: "rt",
+    // Color: "#fff",
+    Size: 12,
+    // text: "ref", //属性はnに統一
+    // Padding: 10,
+    // OPacity: [
+    // 	[14, 0],
+    // 	[14, 1],
+    // ],
+    Css: {
+      "border": "1px solid #fff",
+      "border-radius": "4px 4px 50% 50%",
+      "background": "#06a",
+      "padding": "5px",
+      "color": "#fff"
+    }
+  },
+  {
+    Type: "p",
+    Layer: "d",
+    // text: "name",
+    Color: [0.4, 0.4, 0.4, 1],
+    //"102,102,102",
+    // Color: '666666',
+    Size: 12,
+    // Padding: 10,
+    OPacity: [
+      [13, 0],
+      [14, 1]
+    ]
+  },
+  {
+    Type: "s",
+    Layer: "p"
+    // text: "name",
+    // desc: "com",  tに変更
+    // cat: "Type",  cに変更
+    // Color: '102,102,102',
+    // Size: 13,
+  }
+  // { // 水域
+  // 	Type: "f",
+  // 	Layer: "w2",
+  // 	Color: '170,221,255',
+  // },
+];
+
+// src/js/loadTile.js
+var loadTile_default = async (zxy) => {
+  let propStructs = [];
+  let polygonVertex = [];
+  let polygonVertexBase = 0;
+  let polygonIndex = [];
+  let borderIndex = [];
+  let borderIndexBase = 0;
+  let lineVertex = [];
+  let lineIndex = [];
+  var d = await fetch("https://sasepo.com/t/" + zxy.join("/"));
+  d = await new Pbf(await d.arrayBuffer());
+  var layers = new VectorTile(d).layers;
+  for (var n = style_default.length; n--; ) {
+    var styleProp = style_default[n];
+    var layerName = styleProp.Layer;
+    var layer = layers[layerName];
+    if (!layer) continue;
+    if (styleProp.Type == "p") {
+    } else if (styleProp.Type == "s") {
+    } else {
+      processMVTLayer(layer, styleProp);
+    }
+  }
+  return {
+    propStructs,
+    polygonVertex,
+    polygonIndex,
+    borderIndex,
+    lineVertex,
+    lineIndex
+  };
+  function isClockwise(ring) {
+    let sum = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const p1 = ring[i];
+      const p2 = ring[(i + 1) % ring.length];
+      sum += (p2[0] - p1[0]) * (p2[1] + p1[1]);
+    }
+    return sum < 0;
+  }
+  function processMVTLayer(layer2, prop) {
+    var strokeThickness = prop.thickness;
+    console.log("thikness", strokeThickness);
+    strokeThickness = Array.isArray(strokeThickness) ? 30 : strokeThickness ? strokeThickness : 0;
+    if (prop.Type == "f") {
+      var fillColor = prop.Color;
+      var strokeColor = [0.3, 0.3, 0.3, 1];
+      for (var i = 0; i < layer2.length; i++) {
+        const feature = layer2.feature(i);
+        if (feature.type !== 3) continue;
+        const geometry = feature.loadGeometry();
+        let currentPolygonRings = [];
+        for (const ring of geometry) {
+          if (ring.length === 0) continue;
+          const formattedRing = ring.map((p) => [p.x, p.y]);
+          if (isClockwise(formattedRing)) {
+            if (currentPolygonRings.length > 0) {
+              addPolygon(
+                currentPolygonRings,
+                fillColor,
+                strokeColor,
+                strokeThickness
+              );
+            }
+            currentPolygonRings = [formattedRing];
+          } else {
+            currentPolygonRings.push(formattedRing);
+          }
+        }
+        if (currentPolygonRings.length > 0) {
+          addPolygon(
+            currentPolygonRings,
+            fillColor,
+            strokeColor,
+            strokeThickness
+          );
+        }
+      }
+    } else {
+      var strokeColor = prop.Color;
+      for (var i = 0; i < layer2.length; i++) {
+        const feature = layer2.feature(i);
+        if (feature.type !== 2) continue;
+        const geometry = feature.loadGeometry();
+        for (const ring of geometry) {
+          if (ring.length === 0) continue;
+          const formattedRing = ring.map((p) => [p.x, p.y]);
+          addPolyline(formattedRing, strokeColor, strokeThickness);
+        }
+      }
+    }
+  }
+  function addPolygon(rings, fillColor, lineColor, strokeThickness) {
+    const earcutRawData = [];
+    const holeIndices = [];
+    let currentVertexCount = 0;
+    for (let i = 0; i < rings.length; i++) {
+      const ring = rings[i];
+      if (!ring.length) continue;
+      if (i > 0) {
+        holeIndices.push(currentVertexCount);
+      }
+      for (let i2 = 0; i2 < ring.length; i2++) {
+        const p = ring[i2];
+        earcutRawData.push(p[0], p[1]);
+        const packed = (p[1] & 65535) << 16 | p[0] & 65535;
+        polygonVertex.push(packed, propStructs.length);
+        currentVertexCount++;
+        if (strokeThickness > 0) {
+          borderIndex.push(borderIndexBase + i2);
+          borderIndex.push(
+            borderIndexBase + (i2 + 1 == ring.length ? 0 : i2 + 1)
+          );
+        }
+      }
+      borderIndexBase += ring.length;
+    }
+    const indices = earcut(earcutRawData, holeIndices);
+    if (!indices.length) return;
+    indices.forEach((idx) => {
+      polygonIndex.push(polygonVertexBase + idx);
+    });
+    propStructs.push({
+      fillColor,
+      lineColor,
+      thickness: strokeThickness
+    });
+    polygonVertexBase += currentVertexCount;
+  }
+  function addPolyline(points, color, thickness) {
+    const numPoints = points.length;
+    if (numPoints < 2) return;
+    for (let i = 0; i < numPoints - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      const base = lineVertex.length;
+      const featureID = propStructs.length;
+      let packed = (current[1] & 65535) << 16 | current[0] & 65535;
+      const dx = next[0] - current[0];
+      const dy = -next[1] + current[1];
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [dy, -dx]
+      });
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [-dy, dx]
+      });
+      packed = (next[1] & 65535) << 16 | next[0] & 65535;
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [-dy, dx]
+      });
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [dy, -dx]
+      });
+      lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
+      if (i > 0) {
+        lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
+      }
+    }
+    propStructs.push({
+      fillColor: [1, 1, 1, 0],
+      lineColor: color,
+      thickness
+    });
+  }
+};
+
 // src/js/worker.js
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -1795,7 +2091,7 @@ async function init(canvas, size, viewArray) {
       // 実体バッファ
     ]
   });
-  const tileData = await generateSceneData();
+  var tileData = await loadTile_default([15, 28191, 13180]);
   console.log("tileData", tileData);
   const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
   console.log("tiles", visibleTiles);

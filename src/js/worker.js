@@ -255,8 +255,8 @@ async function init(canvas, size, viewArray) {
   });
 
   // 初回のデータ生成を実行
-  const tileData = await generateSceneData();
-  // var tileData = await loadTile([15, 28191, 13180]);
+  // const tileData = await generateSceneData();
+  var tileData = await loadTile([15, 28191, 13180]);
   console.log("tileData", tileData);
   const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
   console.log("tiles", visibleTiles);

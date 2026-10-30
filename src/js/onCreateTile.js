@@ -45,32 +45,6 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   const borderIndexData = new Uint32Array(tileData.borderIndex);
   device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
 
-  // const lineVertexBuffer = device.createBuffer({
-  //   size: new Float32Array(tileData.lineVertex).byteLength,
-  //   usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  // });
-  // const lineVertexData = new Float32Array(tileData.lineVertex);
-  // device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
-
-  //   const totalElements = tileData.lineVertex.length;
-  //   const uint32View = new Uint32Array(totalElements);
-  //   const float32View = new Float32Array(uint32View.buffer); // ★同じメモリを共有
-  //
-  //   for (let i = 0; i < totalElements; i++) {
-  //     const mod = i % 4;
-  //     if (mod === 0 || mod === 1) {
-  //       uint32View[i] = tileData.lineVertex[i]; // 整数として書き込み
-  //     } else {
-  //       float32View[i] = tileData.lineVertex[i]; // 浮動小数点として書き込み（同じ場所にビットをそのまま格納）
-  //     }
-  //   }
-  //
-  //   const lineVertexBuffer = device.createBuffer({
-  //     size: uint32View.byteLength,
-  //     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  //   });
-  //   device.queue.writeBuffer(lineVertexBuffer, 0, uint32View.buffer);
-
   STRIDE = 16; // lineVertex は1要素16バイト
   const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device.createBuffer({

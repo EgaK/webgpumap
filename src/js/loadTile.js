@@ -5,13 +5,17 @@ import earcut from "./util/earcut.dev";
 import style from "./style";
 
 export default async (zxy) => {
-  let allVertices = [];
-  let featureId = [];
-  let allIndices = [];
-  let commandStructs = [];
-  let maxVerticesPerInstance = 0;
-  let vertexBase = 0;
-  let indexBase = 0;
+  let propStructs = [];
+  let polygonVertex = [];
+  let polygonVertexBase = 0;
+
+  let polygonIndex = [];
+
+  let borderIndex = [];
+  let borderIndexBase = 0;
+
+  let lineVertex = []; // 幅付きライン専用の頂点配列
+  let lineIndex = []; // 幅付きライン専用のインデックス配列
 
   var d = await fetch("https://sasepo.com/t/" + zxy.join("/"));
   d = await new Pbf(await d.arrayBuffer());
@@ -31,21 +35,13 @@ export default async (zxy) => {
       processMVTLayer(layer, styleProp);
     }
   }
-  // var layer = layers["r5"];
-  // 最大頂点数の計算
-  commandStructs.forEach((cmd) => {
-    let count = 0;
-    if (cmd.fig_type === 0) count = cmd.index_count;
-    else if (cmd.fig_type === 1) count = (cmd.index_count - 1) * 6;
-    else if (cmd.fig_type === 2) count = cmd.index_count * 3;
-    if (count > maxVerticesPerInstance) maxVerticesPerInstance = count;
-  });
   return {
-    command: commandStructs,
-    vertex: allVertices,
-    featureId: featureId,
-    index: allIndices,
-    maxVerticesPerInstance,
+    propStructs,
+    polygonVertex,
+    polygonIndex,
+    borderIndex,
+    lineVertex,
+    lineIndex,
   };
 
   // リングが時計回り（外枠）かどうかを判定するヘルパー関数
@@ -61,10 +57,16 @@ export default async (zxy) => {
 
   // MVTレイヤーの全地物を処理するメインループ
   function processMVTLayer(layer, prop) {
+    var strokeThickness = prop.thickness;
+    console.log("thikness", strokeThickness);
+    strokeThickness = Array.isArray(strokeThickness)
+      ? 30
+      : strokeThickness
+        ? strokeThickness
+        : 0;
     if (prop.Type == "f") {
       var fillColor = prop.Color;
       var strokeColor = [0.3, 0.3, 0.3, 1];
-      var strokeThickness = 1;
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
         // console.log("feature.type", feature.type, feature);
@@ -111,7 +113,6 @@ export default async (zxy) => {
       }
     } else {
       var strokeColor = prop.Color;
-      var strokeThickness = 5;
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
         // console.log("feature.type", feature.type, feature);
@@ -130,134 +131,114 @@ export default async (zxy) => {
     }
   }
 
-  // ヘルパー：ポリゴン追加
-  function addPolygon(rings, fillColor, strokeColor, strokeThickness) {
+  function addPolygon(rings, fillColor, lineColor, strokeThickness) {
     // rings は [ outerLoop, innerHole1, innerHole2, ... ] という構造を想定
 
     const earcutRawData = []; // earcut用の一時的なフラット配列 [x1,y1, x2,y2, ...]
-    const flatData = []; // GPUバッファ用のパックされた u32 配列
     const holeIndices = []; // 穴の開始位置（頂点単位のインデックス）を記録する配列
 
     let currentVertexCount = 0;
 
     for (let i = 0; i < rings.length; i++) {
       const ring = rings[i];
-      if (ring.length === 0) continue;
-
+      if (!ring.length) continue;
       // 2つ目以降のリング（＝穴）である場合、現在の合計頂点数を穴の開始位置として記録
       if (i > 0) {
         holeIndices.push(currentVertexCount);
       }
 
       // リング内の頂点を処理
-      for (const p of ring) {
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i];
         // earcut用
         earcutRawData.push(p[0], p[1]);
 
         // GPUバッファ用（16ビットのバイナリを取り出してドッキング）
-        const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-        flatData.push(combined);
-        // flatData.push({
-        //   packed_pos: combined,
-        //   feature_id: commandStructs.length,
-        // });
-        featureId.push(commandStructs.length);
-
+        const packed = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
+        polygonVertex.push(packed, propStructs.length);
         currentVertexCount++;
+
+        // 枠線（折れ線）用の処理
+        // 外周だけでなく、すべてのリング（穴の輪郭含む）に対して個別に枠線を描画する
+        if (strokeThickness > 0) {
+          borderIndex.push(borderIndexBase + i);
+          borderIndex.push(
+            borderIndexBase + (i + 1 == ring.length ? 0 : i + 1),
+          );
+        }
       }
+      borderIndexBase += ring.length;
     }
 
     // 生のX,Y配列と、穴の位置配列を渡して三角形分割を行う
     const indices = earcut(earcutRawData, holeIndices);
 
-    if (indices.length === 0) return;
+    if (!indices.length) return;
 
-    // 1要素 = 1頂点 になったため、頂点数は平坦化した全体の合計頂点数になります
-    const vertexCount = flatData.length;
+    indices.forEach((idx) => {
+      polygonIndex.push(polygonVertexBase + idx);
+    });
 
-    allVertices.push(...flatData);
-    allIndices.push(...indices);
-
-    commandStructs.push({
-      color: fillColor,
-      thickness: 0.0,
-      index_base: indexBase,
-      index_count: indices.length,
-      fig_type: 0,
-      vertex_base: vertexBase,
+    propStructs.push({
+      fillColor,
+      lineColor,
+      thickness: strokeThickness,
     });
 
     // グローバルなオフセットの更新
-    vertexBase += vertexCount;
-    indexBase += indices.length;
-
-    // 枠線（折れ線）用の処理
-    // 外周だけでなく、すべてのリング（穴の輪郭含む）に対して個別に枠線を描画する
-    for (const ring of rings) {
-      if (ring.length > 0) {
-        const strokePoints = [...ring, ring[0]]; // 終点と始点をつなぎ合わせる
-        addPolyline(strokePoints, strokeColor, strokeThickness);
-      }
-    }
+    polygonVertexBase += currentVertexCount;
   }
 
-  function addPolyline(points, color, thickness) {}
+  function addPolyline(points, color, thickness) {
+    const numPoints = points.length;
+    if (numPoints < 2) return;
 
-  // ヘルパー：折れ線追加
-  function addPolyline2(points, color, thickness) {
-    for (const p of points) {
-      const combined = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-      allVertices.push(combined);
-    }
-    const pointsCount = points.length; // 生の頂点数
-    const segmentCount = pointsCount - 1; // 線分の数
-    const indexCountForThisLine = segmentCount * 6; // この線分全体で消費するインデックス数
+    for (let i = 0; i < numPoints - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      const base = lineVertex.length;
 
-    // ★ インデックス配列の自動生成 (0,1,2, 2,3,0, 1,2,3, 3,4,1...)
-    // 頂点シェーダー側で扱いやすくするため、セグメントごとに独立した連番を作ります
-    for (let s = 0; s < segmentCount; s++) {
-      // 各セグメントは「生頂点のs番目とs+1番目」を使いますが、
-      // 拡張して長方形（4つの角）にするため、1セグメントごとに4つずつインデックスを進めます。
-      const base = s * 4;
-      allIndices.push(
-        base + 0,
-        base + 1,
-        base + 2,
-        base + 2,
-        base + 3,
-        base + 0,
-      );
-    }
+      const featureID = propStructs.length;
+      let packed = ((current[1] & 0xffff) << 16) | (current[0] & 0xffff);
+      const dx = next[0] - current[0];
+      // GPU側の座標に合わせて符号を反転しておく
+      const dy = -next[1] + current[1];
+      // const len = Math.hypot(dx, dy) || 1.0;
 
-    commandStructs.push({
-      color: color,
-      thickness: thickness,
-      index_base: indexBase,
-      index_count: indexCountForThisLine,
-      fig_type: 1,
-      vertex_base: vertexBase,
-    });
-    vertexBase += points.length;
-    indexBase += indexCountForThisLine;
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [dy, -dx],
+      });
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [-dy, dx],
+      });
 
-    // 各頂点に関節用の「丸」を追加
-    if (thickness > 0) {
-      const MAX_SEGMENTS = 16; // 最大16分割
-      const maxIndexCount = MAX_SEGMENTS * 3; // 48
-      for (let i = 0; i < points.length; i++) {
-        commandStructs.push({
-          color: color,
-          thickness: thickness,
-          index_base: indexBase,
-          index_count: maxIndexCount,
-          fig_type: 2,
-          vertex_base: vertexBase,
-        });
-        for (let s = 0; s < MAX_SEGMENTS; s++) {
-          allIndices.push(0, s + 1, s === MAX_SEGMENTS - 1 ? 1 : s + 2);
-        }
-        indexBase += maxIndexCount;
+      packed = ((next[1] & 0xffff) << 16) | (next[0] & 0xffff);
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [-dy, dx],
+      });
+      lineVertex.push({
+        packed,
+        featureID,
+        normal: [dy, -dx],
+      });
+
+      lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
+
+      if (i > 0) {
+        lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
       }
     }
+
+    propStructs.push({
+      fillColor: [1, 1, 1, 0],
+      lineColor: color,
+      thickness: thickness,
+    });
   }
 };
