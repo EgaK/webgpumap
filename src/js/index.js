@@ -8,7 +8,7 @@ const viewArray = new Float32Array(sab);
 // 初期値
 viewArray[0] = 0; // X
 viewArray[1] = 0; // Y
-viewArray[2] = 1; // Zoom
+viewArray[2] = 16; // Zoom
 viewArray[3] = 1; // フラグ用 (0.0 = 変化なし, 1.0 = 変化あり)
 
 const canvas = $("canvas");
@@ -17,9 +17,15 @@ canvas[0].height = 1200;
 canvas.css({ width: 400 + "px", height: 400 + "px" });
 const offcanvas = canvas[0].transferControlToOffscreen();
 
-const worker = new Worker("/js/worker.min.js");
+const blob = new Blob([WORKER_CODE], { type: "application/javascript" });
+const workerUrl = URL.createObjectURL(blob);
+
+// 3. Workerを生成
+const worker = new Worker(workerUrl);
+// const worker = new Worker("/js/worker.min.js");
 worker.postMessage({ "c": offcanvas, "s": [800, 800], "b": sab }, [offcanvas]);
 
+console.log("test build");
 // const canvas = document.getElementById("a");
 // const offcanvas = canvas.transferControlToOffscreen();
 //

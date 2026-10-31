@@ -21,7 +21,7 @@ struct Property {
 struct Uniforms {
   u_offset: vec2f,         // 8バイト (オフセット: 0)  <- viewArray[0], [1]
   u_zoom: f32,             // 4バイト (オフセット: 8)  <- viewArray[2]
-  u_flag: f32,             // 更新フラグ（必要ないけどpaddingのため配置）
+  u_scale: f32,             // 更新フラグ（必要ないけどpaddingのため配置）
   u_res_x: f32,            // 16 〜 19 バイト (canvas.width)
   u_res_y: f32,            // 20 〜 23 バイト (canvas.height)
 }
@@ -60,7 +60,7 @@ fn raw_to_ndc(packed_val: u32) -> vec2f {
 fn sheer(color:vec3f, opacity: f32) -> vec4f {
   // if(opacity<0){
   //   let v_coord = (-opacity - 0.5) / 4.0;
-  //   let uv = vec2f(uniforms.u_zoom, v_coord);
+  //   let uv = vec2f(uniforms.u_scale, v_coord);
   //   let sampled_data = textureSampleLevel(zoom_texture_2d, linear_sampler, uv, 0.0);
   //   return vec4f(color, f32(sampled_data.g));
   // }
@@ -73,7 +73,7 @@ fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
   let prop = properties[input.feature_id]; // 直接アクセスできる
   let ndc_pos = raw_to_ndc(input.packed_pos); // 直接アクセスできる
 
-  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
+  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
 
   var z = f32(input.feature_id + 1u) * 1e-6;
   output.position = vec4f(cam_pos, z, 1.0);
@@ -88,7 +88,7 @@ fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
   var output: VertexOutput;
   let prop = properties[input.feature_id]; // 直接アクセスできる
   let ndc_pos = raw_to_ndc(input.packed_pos); // 直接アクセスできる
-  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
+  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
   var z = f32(input.feature_id + 1u) * 1e-6 + 1e-7;
   output.position = vec4f(cam_pos, z, 1.0);
 
@@ -104,12 +104,12 @@ fn vs_polyline(
   var output: VertexOutput;
   let ndc_pos = raw_to_ndc(input.packed_pos); // 直接アクセスできる
   let prop = properties[input.feature_id];
-  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_zoom;
+  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
 
   var thickness = prop.thickness;
   if　(thickness<0)　{
     let v_coord = (-thickness - 0.5) / 4.0;
-    let uv = vec2f(uniforms.u_zoom/100, v_coord);
+    let uv = vec2f(uniforms.u_scale, v_coord);
     let sampled_data = textureSampleLevel(zoom_texture_2d, linear_sampler, uv, 0.0);
     thickness = sampled_data.r;
   }

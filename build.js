@@ -55,7 +55,6 @@ async function jsBuild() {
   if (!isProd) {
     await esbuild.build({
       entryPoints: {
-        "index": "src/js/index.js",
         "worker": "src/js/worker.js",
       },
       bundle: true,
@@ -74,51 +73,74 @@ async function jsBuild() {
     });
 
     // あえてworkerとindexを別にコンパイルしてプロパティ名圧縮で対策してないと問題がおきるようにしてる
-    await Promise.all([
-      runClosure([
-        "--compilation_level",
-        "ADVANCED_OPTIMIZATIONS",
-        "--language_in",
-        "ECMASCRIPT_2020",
-        "--language_out",
-        "ECMASCRIPT_2020",
-        "--js",
-        "dist/statics/worker.js",
-        "--js_output_file",
-        "dist/statics/worker.min.js",
-        "--create_source_map",
-        "dist/statics/worker.map",
-        "--source_map_location_mapping",
-        "'dist/statics/|/'",
-        "--output_wrapper",
-        "'%output%//# sourceMappingURL=/worker.map'",
-        "--externs",
-        "closure-externs.js",
-        "--warning_level",
-        "QUIET",
-      ]),
-      runClosure([
-        "--compilation_level",
-        "ADVANCED_OPTIMIZATIONS",
-        "--language_in",
-        "ECMASCRIPT_2020",
-        "--language_out",
-        "ECMASCRIPT_2020",
-        "--js",
-        "dist/statics/index.js",
-        "--js_output_file",
-        "dist/statics/index.min.js",
-        "--create_source_map",
-        "dist/statics/index.map",
-        "--source_map_location_mapping",
-        "'dist/statics/|/'",
-        "--output_wrapper",
-        "'%output%//# sourceMappingURL=/index.map'",
-        "--externs",
-        "closure-externs.js",
-        "--warning_level",
-        "QUIET",
-      ]),
+    await runClosure([
+      "--compilation_level",
+      "ADVANCED_OPTIMIZATIONS",
+      "--language_in",
+      "ECMASCRIPT_2020",
+      "--language_out",
+      "ECMASCRIPT_2020",
+      "--js",
+      "dist/statics/worker.js",
+      "--js_output_file",
+      "dist/statics/worker.min.js",
+      "--create_source_map",
+      "dist/statics/worker.map",
+      "--source_map_location_mapping",
+      "'dist/statics/|/'",
+      "--output_wrapper",
+      "'%output%//# sourceMappingURL=/worker.map'",
+      "--externs",
+      "closure-externs.js",
+      "--warning_level",
+      "QUIET",
+    ]);
+
+    const minifiedWorkerCode = fs.readFileSync(
+      "dist/statics/worker.min.js",
+      "utf8",
+    );
+
+    await esbuild.build({
+      entryPoints: {
+        "index": "src/js/index.js",
+      },
+      bundle: true,
+      outdir: "dist/statics",
+      format: "esm",
+      target: "es2020",
+      define: {
+        "DEVELOP": "true",
+        "WORKER_CODE": JSON.stringify(minifiedWorkerCode),
+      },
+      plugins: [
+        glsl({
+          minify: true, // ★ WGSL/GLSLファイルをインポート時に自動でMinifyする
+        }),
+      ],
+    });
+
+    await runClosure([
+      "--compilation_level",
+      "ADVANCED_OPTIMIZATIONS",
+      "--language_in",
+      "ECMASCRIPT_2020",
+      "--language_out",
+      "ECMASCRIPT_2020",
+      "--js",
+      "dist/statics/index.js",
+      "--js_output_file",
+      "dist/statics/index.min.js",
+      "--create_source_map",
+      "dist/statics/index.map",
+      "--source_map_location_mapping",
+      "'dist/statics/|/'",
+      "--output_wrapper",
+      "'%output%//# sourceMappingURL=/index.map'",
+      "--externs",
+      "closure-externs.js",
+      "--warning_level",
+      "QUIET",
     ]);
 
     log(`\u001b[35mbuild Javascript\u001b[0m ${Date.now() - startT}ms`);

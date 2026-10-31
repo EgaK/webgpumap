@@ -3,6 +3,7 @@ import generateSceneData from "./generateSene";
 import onCreateTile from "./onCreateTile";
 import loadTile from "./loadTile";
 import style from "./style";
+import { scale } from "./util/calc";
 
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -103,6 +104,7 @@ async function init(canvas, size, viewArray) {
   // 2. 設計図を元に パイプライン を作成する
   // ==========================================
   const shaderModule = device.createShaderModule({ code: shaderCode });
+
   const polygonPipeline = device.createRenderPipeline({
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device.createPipelineLayout({
@@ -145,7 +147,8 @@ async function init(canvas, size, viewArray) {
       count: 4, // ★パイプライン側でも4倍を明示
     },
   });
-  const borderPipeline = device.createRenderPipeline({
+
+  const thinLinePipeline = device.createRenderPipeline({
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
@@ -187,6 +190,7 @@ async function init(canvas, size, viewArray) {
       count: 4, // ★パイプライン側でも4倍を明示
     },
   });
+
   const linePipeline = device.createRenderPipeline({
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device.createPipelineLayout({
@@ -281,8 +285,8 @@ async function init(canvas, size, viewArray) {
   const texWidth = 32;
   const texHeight = 4; // 本来はstyleTable.lengthだけどWGSL内の値を動的に変えられないので固定
   const textureData = new Float16Array(texWidth * texHeight * 4);
-  const minZoom = 0.0;
-  const maxZoom = 100.0;
+  const minZoom = 10;
+  const maxZoom = 20;
 
   for (let tableId = 0; tableId < texHeight; tableId++) {
     const thickness = thicknessTable[tableId];
@@ -290,8 +294,9 @@ async function init(canvas, size, viewArray) {
     if (!thickness && !opacity) break;
 
     for (let i = 0; i < texWidth; i++) {
-      const t = i / (texWidth - 1); // 0.0 〜 1.0
-      const targetZoom = minZoom + t * (maxZoom - minZoom);
+      const t = i / (texWidth - 1);
+      const targetZoom = Math.pow(2, minZoom + t * (maxZoom - minZoom)) * 3e-5;
+      // console.log("targetZoom", targetZoom);
 
       const pixelIdx = (tableId * texWidth + i) * 4;
       textureData[pixelIdx + 0] = thickness
@@ -305,7 +310,7 @@ async function init(canvas, size, viewArray) {
     }
   }
 
-  // console.log("textureData", textureData);
+  console.log("textureData", textureData);
 
   // WebGPU 2Dテクスチャの作成
   const styleTexture2D = device.createTexture({
@@ -357,11 +362,17 @@ async function init(canvas, size, viewArray) {
   // ユニフォームバッファを更新する関数を作成
   function updateUniforms() {
     // 1. offsetとzoom, flagw（16バイト分）を、GPUバッファの先頭（オフセット0）に直接転送
+
     device.queue.writeBuffer(
       uniformBuffer,
       0,
-      viewArray.buffer, // ArrayBufferを直接指定
-      viewArray.byteOffset, // 開始位置
+      new Float32Array([
+        viewArray[0],
+        viewArray[1],
+        viewArray[2],
+        scale(viewArray[2]), //flagはシェーダでは必要ないのでscaleとして使用する
+      ]).buffer,
+      0, // 開始位置
       16, // 16バイト分 (f32 x 4要素分)
     );
   }
@@ -430,7 +441,7 @@ async function init(canvas, size, viewArray) {
       renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       // ボーダー
-      renderPass.setPipeline(borderPipeline);
+      renderPass.setPipeline(thinLinePipeline);
       renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       // ポリライン;
@@ -440,7 +451,7 @@ async function init(canvas, size, viewArray) {
       renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       // 細いポリライン
       renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-      renderPass.setPipeline(borderPipeline);
+      renderPass.setPipeline(thinLinePipeline);
       renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }

@@ -1,5 +1,5 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var zoom_texture_2d:texture_2d<f32>;@group(0)@binding(2)var linear_sampler:sampler;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,opacity:f32)->vec4f{return vec4f(color,1.0);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var thickness=prop.thickness;if(thickness<0){let v_coord=(-thickness-0.5)/4.0;let uv=vec2f(uniforms.u_zoom/100,v_coord);let sampled_data=textureSampleLevel(zoom_texture_2d,linear_sampler,uv,0.0);thickness=sampled_data.r;}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_scale:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var zoom_texture_2d:texture_2d<f32>;@group(0)@binding(2)var linear_sampler:sampler;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,opacity:f32)->vec4f{return vec4f(color,1.0);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var thickness=prop.thickness;if(thickness<0){let v_coord=(-thickness-0.5)/4.0;let uv=vec2f(uniforms.u_scale,v_coord);let sampled_data=textureSampleLevel(zoom_texture_2d,linear_sampler,uv,0.0);thickness=sampled_data.r;}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
 
 // src/js/util/earcut.dev.js
 var steiners = /* @__PURE__ */ new Set();
@@ -1489,6 +1489,11 @@ var readUtf8 = (buf, pos, end) => {
   return str;
 };
 
+// src/js/util/calc.js
+var scale = (z) => {
+  return Math.pow(2, z) * 3e-5;
+};
+
 // src/js/style.js
 var style_default = [
   {
@@ -1499,12 +1504,12 @@ var style_default = [
     //"150,150,150",
     // Color: '969696',
     thickness: [
-      [10, 10],
-      [20, 100]
+      [scale(15), 10],
+      [scale(18), 100]
     ],
     OPacity: [
-      [0, 0.1],
-      [100, 1]
+      [scale(15), 0.1],
+      [scale(18), 1]
     ]
     // thickness: 5,
     // Dash: [30, 30],
@@ -2034,7 +2039,7 @@ async function init(canvas, size, viewArray) {
       // ★パイプライン側でも4倍を明示
     }
   });
-  const borderPipeline = device.createRenderPipeline({
+  const thinLinePipeline = device.createRenderPipeline({
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
@@ -2167,15 +2172,15 @@ async function init(canvas, size, viewArray) {
   const texWidth = 32;
   const texHeight = 4;
   const textureData = new Float16Array(texWidth * texHeight * 4);
-  const minZoom = 0;
-  const maxZoom = 100;
+  const minZoom = 10;
+  const maxZoom = 20;
   for (let tableId = 0; tableId < texHeight; tableId++) {
     const thickness = thicknessTable[tableId];
     const opacity = opacityTable[tableId];
     if (!thickness && !opacity) break;
     for (let i = 0; i < texWidth; i++) {
       const t = i / (texWidth - 1);
-      const targetZoom = minZoom + t * (maxZoom - minZoom);
+      const targetZoom = Math.pow(2, minZoom + t * (maxZoom - minZoom)) * 3e-5;
       const pixelIdx = (tableId * texWidth + i) * 4;
       textureData[pixelIdx + 0] = thickness ? interpolate(targetZoom, thickness) : 1;
       textureData[pixelIdx + 1] = opacity ? interpolate(targetZoom, opacity) : 1;
@@ -2183,6 +2188,7 @@ async function init(canvas, size, viewArray) {
       textureData[pixelIdx + 3] = 1;
     }
   }
+  console.log("textureData", textureData);
   const styleTexture2D = device.createTexture({
     size: [texWidth, texHeight, 1],
     // 高さを 16 に
@@ -2227,9 +2233,14 @@ async function init(canvas, size, viewArray) {
     device.queue.writeBuffer(
       uniformBuffer,
       0,
-      viewArray.buffer,
-      // ArrayBufferを直接指定
-      viewArray.byteOffset,
+      new Float32Array([
+        viewArray[0],
+        viewArray[1],
+        viewArray[2],
+        scale(viewArray[2])
+        //flagはシェーダでは必要ないのでscaleとして使用する
+      ]).buffer,
+      0,
       // 開始位置
       16
       // 16バイト分 (f32 x 4要素分)
@@ -2293,7 +2304,7 @@ async function init(canvas, size, viewArray) {
       renderPass.setPipeline(polygonPipeline);
       renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
-      renderPass.setPipeline(borderPipeline);
+      renderPass.setPipeline(thinLinePipeline);
       renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
@@ -2301,7 +2312,7 @@ async function init(canvas, size, viewArray) {
       renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-      renderPass.setPipeline(borderPipeline);
+      renderPass.setPipeline(thinLinePipeline);
       renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }

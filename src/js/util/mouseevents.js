@@ -3,8 +3,14 @@ let previousMousePosition = { x: 0, y: 0 };
 
 export default (viewArray) => {
   const canvas = document.getElementById("a");
-  const devicePixelRatio = window.devicePixelRatio || 1;
 
+  const v = document.getElementById("zoom");
+  const view = () => {
+    requestAnimationFrame(view);
+    if (!viewArray[3]) return;
+    v.innerText = `zoom: ${viewArray[2].toFixed(2)}, x:${viewArray[0].toFixed(2)}, y:${viewArray[1].toFixed(2)}`;
+  };
+  view();
   // ------------------------------------------
   // 7. マウス・ホイールイベントの追加
   // ------------------------------------------
@@ -21,14 +27,21 @@ export default (viewArray) => {
       const zoomFactor = 1.1;
       const oldZoom = viewArray[2];
 
-      if (e.deltaY < 0) {
-        viewArray[2] *= zoomFactor;
-      } else {
-        viewArray[2] /= zoomFactor;
-      }
-      viewArray[2] = Math.max(0.1, Math.min(viewArray[2], 100.0)); // 制限
+      // if (e.deltaY < 0) {
+      //   viewArray[2] *= zoomFactor;
+      // } else {
+      //   viewArray[2] /= zoomFactor;
+      // }
+      // viewArray[2] = Math.max(100, Math.min(viewArray[2], 400.0)); // 制限
 
-      // console.log("zoom:", viewArray[2]);
+      var dz = e.deltaY;
+      dz = dz > 5 ? 5 : dz < -5 ? -5 : dz;
+      var z = viewArray[2] - dz / 100;
+      z = Math.max(10, Math.min(z, 20));
+      if (viewArray[2] == z) return;
+
+      viewArray[2] = z;
+
       // マウス位置を中心に拡大するためのオフセット調整
       viewArray[0] += mouseX / oldZoom - mouseX / viewArray[2];
       viewArray[1] += mouseY / oldZoom - mouseY / viewArray[2];
