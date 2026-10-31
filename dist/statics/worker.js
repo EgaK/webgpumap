@@ -1,5 +1,5 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec4f,lineColor:vec4f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var zoom_texture_2d:texture_2d<f32>;@group(0)@binding(2)var linear_sampler:sampler;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=prop.fillColor;return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=prop.lineColor;return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var thickness=prop.thickness;if(thickness<0){let v_coord=(-thickness-0.5)/4.0;let uv=vec2f(uniforms.u_zoom/10,v_coord);let sampled_data=textureSampleLevel(zoom_texture_2d,linear_sampler,uv,0.0);thickness=sampled_data.r;}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=prop.lineColor;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_flag:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var zoom_texture_2d:texture_2d<f32>;@group(0)@binding(2)var linear_sampler:sampler;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,opacity:f32)->vec4f{return vec4f(color,1.0);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_zoom;var thickness=prop.thickness;if(thickness<0){let v_coord=(-thickness-0.5)/4.0;let uv=vec2f(uniforms.u_zoom/100,v_coord);let sampled_data=textureSampleLevel(zoom_texture_2d,linear_sampler,uv,0.0);thickness=sampled_data.r;}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
 
 // src/js/util/earcut.dev.js
 var steiners = /* @__PURE__ */ new Set();
@@ -541,7 +541,7 @@ function signedArea(data, start, end, dim) {
 
 // src/js/onCreateTile.js
 function onCreateTile(device, tileBindGroupLayout, tileData) {
-  let STRIDE = 48;
+  let STRIDE = 32;
   const propertyBufferSize = tileData.propStructs.length * STRIDE;
   const propertyBuffer = device.createBuffer({
     size: propertyBufferSize,
@@ -552,6 +552,7 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
     const offset = i * STRIDE;
     const buf1 = new Float32Array([
       ...cmd.fillColor,
+      cmd.opacity,
       ...cmd.lineColor,
       cmd.thickness
     ]);
@@ -597,6 +598,18 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
   });
   const lineIndexData = new Uint32Array(tileData.lineIndex);
   device.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
+  const thinVertexBuffer = device.createBuffer({
+    size: tileData.thinVertex.length * 8,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
+  const thinVertexData = new Uint32Array(tileData.thinVertex);
+  device.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
+  const thinIndexBuffer = device.createBuffer({
+    size: tileData.thinIndex.length * 4,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+  });
+  const thinIndexData = new Uint32Array(tileData.thinIndex);
+  device.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
   const bindGroup = device.createBindGroup({
     layout: tileBindGroupLayout,
     // グループ1の設計図を指定
@@ -616,7 +629,10 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
     borderIndexCount: tileData.borderIndex.length,
     lineVertexBuffer,
     lineIndexBuffer,
-    lineIndexCount: tileData.lineIndex.length
+    lineIndexCount: tileData.lineIndex.length,
+    thinVertexBuffer,
+    thinIndexBuffer,
+    thinIndexCount: tileData.thinIndex.length
   };
 }
 
@@ -1479,12 +1495,16 @@ var style_default = [
     // 鉄道
     Type: "l",
     Layer: "t",
-    Color: [0.59, 0.59, 0.59, 1],
+    Color: [0.59, 0.59, 0.59],
     //"150,150,150",
     // Color: '969696',
     thickness: [
-      [10, 30],
-      [15, 100]
+      [10, 10],
+      [20, 100]
+    ],
+    OPacity: [
+      [0, 0.1],
+      [100, 1]
     ]
     // thickness: 5,
     // Dash: [30, 30],
@@ -1497,7 +1517,7 @@ var style_default = [
     // 建物
     Type: "f",
     Layer: "b",
-    Color: [0.94, 0.96, 0.94, 1],
+    Color: [0.94, 0.96, 0.94],
     //"240,245,240",
     // Color: 'f0f5f0',
     // Color: '200,200,200',
@@ -1509,7 +1529,7 @@ var style_default = [
     // 道路輪郭
     Type: "l",
     Layer: "r1",
-    Color: [0.39, 0.39, 0.39, 1],
+    Color: [0.39, 0.39, 0.39],
     //"99,99,99",
     // Color: '636363',
     thickness: 1,
@@ -1522,27 +1542,27 @@ var style_default = [
     // 道路部品
     Type: "l",
     Layer: "r2",
-    Color: [0.77, 0.63, 0, 1],
+    Color: [0.77, 0.63, 0],
     //"196,160,0",
     // Color: 'c4a000',
-    thickness: 1,
-    OPacity: [
-      [16, 0],
-      [17, 1]
-    ]
+    thickness: 1
+    // OPacity: [
+    //   [16, 0],
+    //   [17, 1],
+    // ],
   },
   {
     // その他の道路
     Type: "f",
     Layer: "r5",
-    Color: [1, 1, 1, 1]
+    Color: [1, 1, 1]
     // Color: 'ffffff',
   },
   {
     // 高速
     Type: "f",
     Layer: "r3",
-    Color: [1, 0.77, 0.6, 1]
+    Color: [1, 0.77, 0.6]
     //"255,197,153",
     // Color: 'ffc599',
   },
@@ -1550,7 +1570,7 @@ var style_default = [
     // 高速 // Zoom13以下のとき
     Type: "l",
     Layer: "r8",
-    Color: [1, 0.77, 0.6, 1],
+    Color: [1, 0.77, 0.6],
     //"255,197,153",
     // Color: 'ffc599',
     // thickness: 1,
@@ -1567,7 +1587,7 @@ var style_default = [
     // 国道
     Type: "f",
     Layer: "r4",
-    Color: [0.93, 0.86, 0.58, 1]
+    Color: [0.93, 0.86, 0.58]
     //"239,220,148",
     // Color: 'efdc94',
   },
@@ -1575,13 +1595,13 @@ var style_default = [
     // 国道 // Zoom13以下のとき
     Type: "l",
     Layer: "r9",
-    Color: [0.93, 0.86, 0.58, 1],
+    Color: [0.93, 0.86, 0.58],
     //"239,220,148",
     // Color: 'efdc94',
     // thickness: 1,
     // OPacity: [
     // 	[10, 0],
-    // 	[12, 1],
+    // 	[12],
     // ],
     thickness: [
       [10, 5],
@@ -1603,7 +1623,7 @@ var style_default = [
     // 水域
     Type: "f",
     Layer: "w",
-    Color: [0.66, 0.86, 1, 1]
+    Color: [0.66, 0.86, 1]
     //"170,221,255",
     // Color: 'aaddff',
   },
@@ -1611,7 +1631,7 @@ var style_default = [
     // 緑
     Type: "f",
     Layer: "g",
-    Color: [0.8, 0.93, 0.66, 1]
+    Color: [0.8, 0.93, 0.66]
     //"204,238,170",
     // Color: 'cceeaa',
   },
@@ -1620,7 +1640,7 @@ var style_default = [
     Type: "p",
     Layer: "c",
     // text: "name",
-    Color: [0.4, 0.4, 0.4, 1],
+    Color: [0.4, 0.4, 0.4],
     //"102,102,102",
     // Color: '666666',
     Size: 14,
@@ -1657,7 +1677,7 @@ var style_default = [
     Type: "p",
     Layer: "d",
     // text: "name",
-    Color: [0.4, 0.4, 0.4, 1],
+    Color: [0.4, 0.4, 0.4],
     //"102,102,102",
     // Color: '666666',
     Size: 12,
@@ -1685,7 +1705,6 @@ var style_default = [
 
 // src/js/loadTile.js
 var loadTile_default = async (zxy) => {
-  console.log("style on loadTile:", style_default);
   let propStructs = [];
   let polygonVertex = [];
   let polygonVertexBase = 0;
@@ -1694,6 +1713,9 @@ var loadTile_default = async (zxy) => {
   let borderIndexBase = 0;
   let lineVertex = [];
   let lineIndex = [];
+  let thinVertex = [];
+  let thinIndex = [];
+  let thinIndexBase = 0;
   var d = await fetch("https://sasepo.com/t/" + zxy.join("/"));
   d = await new Pbf(await d.arrayBuffer());
   var layers = new VectorTile(d).layers;
@@ -1714,7 +1736,9 @@ var loadTile_default = async (zxy) => {
     polygonIndex,
     borderIndex,
     lineVertex,
-    lineIndex
+    lineIndex,
+    thinVertex,
+    thinIndex
   };
   function isClockwise(ring) {
     let sum = 0;
@@ -1729,7 +1753,8 @@ var loadTile_default = async (zxy) => {
     var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
       var fillColor = prop.Color;
-      var strokeColor = [0.3, 0.3, 0.3, 1];
+      var opacity = prop.Opacity || 1;
+      var strokeColor = [0.3, 0.3, 0.3];
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
         if (feature.type !== 3) continue;
@@ -1744,7 +1769,8 @@ var loadTile_default = async (zxy) => {
                 currentPolygonRings,
                 fillColor,
                 strokeColor,
-                strokeThickness
+                strokeThickness,
+                opacity
               );
             }
             currentPolygonRings = [formattedRing];
@@ -1757,12 +1783,14 @@ var loadTile_default = async (zxy) => {
             currentPolygonRings,
             fillColor,
             strokeColor,
-            strokeThickness
+            strokeThickness,
+            opacity
           );
         }
       }
     } else {
       var strokeColor = prop.Color;
+      var opacity = prop.Opacity || 1;
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
         if (feature.type !== 2) continue;
@@ -1770,12 +1798,33 @@ var loadTile_default = async (zxy) => {
         for (const ring of geometry) {
           if (ring.length === 0) continue;
           const formattedRing = ring.map((p) => [p.x, p.y]);
-          addPolyline(formattedRing, strokeColor, strokeThickness);
+          if (strokeThickness != 1) {
+            addPolyline(formattedRing, strokeColor, strokeThickness, opacity);
+          } else {
+            addThin(formattedRing, strokeColor, opacity);
+          }
         }
       }
     }
   }
-  function addPolygon(rings, fillColor, lineColor, strokeThickness) {
+  function addThin(points, color, opacity) {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const packed = (p[1] & 65535) << 16 | p[0] & 65535;
+      thinVertex.push(packed, propStructs.length);
+      if (i < points.length - 1) {
+        thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
+      }
+    }
+    thinIndexBase += points.length;
+    propStructs.push({
+      fillColor: [1, 1, 1],
+      lineColor: color,
+      opacity,
+      thickness: 1
+    });
+  }
+  function addPolygon(rings, fillColor, lineColor, strokeThickness, opacity) {
     const earcutRawData = [];
     const holeIndices = [];
     let currentVertexCount = 0;
@@ -1792,8 +1841,8 @@ var loadTile_default = async (zxy) => {
         polygonVertex.push(packed, propStructs.length);
         currentVertexCount++;
         if (strokeThickness > 0) {
-          borderIndex.push(borderIndexBase + i2);
           borderIndex.push(
+            borderIndexBase + i2,
             borderIndexBase + (i2 + 1 == ring.length ? 0 : i2 + 1)
           );
         }
@@ -1808,11 +1857,12 @@ var loadTile_default = async (zxy) => {
     propStructs.push({
       fillColor,
       lineColor,
+      opacity,
       thickness: strokeThickness
     });
     polygonVertexBase += currentVertexCount;
   }
-  function addPolyline(points, color, thickness) {
+  function addPolyline(points, color, thickness, opacity) {
     const numPoints = points.length;
     if (numPoints < 2) return;
     for (let i = 0; i < numPoints - 1; i++) {
@@ -1850,8 +1900,9 @@ var loadTile_default = async (zxy) => {
       }
     }
     propStructs.push({
-      fillColor: [1, 1, 1, 0],
+      fillColor: [1, 1, 1],
       lineColor: color,
+      opacity,
       thickness
     });
   }
@@ -1898,8 +1949,8 @@ async function init(canvas, size, viewArray) {
   context.configure({
     device,
     format: presentationFormat,
-    alphaMode: "opaque"
-    // alphaMode: "premultiplied",
+    // alphaMode: "opaque",
+    alphaMode: "premultiplied"
   });
   const commonBindGroupLayout = device.createBindGroupLayout({
     entries: [
@@ -2101,29 +2152,33 @@ async function init(canvas, size, viewArray) {
     }
     return table[0][1];
   };
-  let styleTable = [];
+  let thicknessTable = [];
+  let opacityTable = [];
   for (const s of style_default) {
     if (Array.isArray(s.thickness)) {
-      styleTable.push({
-        thickness: s.thickness
-      });
-      s.thickness = -styleTable.length;
+      thicknessTable.push(s.thickness);
+      s.thickness = -thicknessTable.length;
+    }
+    if (Array.isArray(s.OPacity)) {
+      opacityTable.push(s.OPacity);
+      s.OPacity = -opacityTable.length;
     }
   }
   const texWidth = 32;
   const texHeight = 4;
   const textureData = new Float16Array(texWidth * texHeight * 4);
   const minZoom = 0;
-  const maxZoom = 20;
+  const maxZoom = 100;
   for (let tableId = 0; tableId < texHeight; tableId++) {
-    const thicknessTable = styleTable[tableId]?.thickness;
-    if (!thicknessTable) break;
+    const thickness = thicknessTable[tableId];
+    const opacity = opacityTable[tableId];
+    if (!thickness && !opacity) break;
     for (let i = 0; i < texWidth; i++) {
       const t = i / (texWidth - 1);
       const targetZoom = minZoom + t * (maxZoom - minZoom);
       const pixelIdx = (tableId * texWidth + i) * 4;
-      textureData[pixelIdx + 0] = interpolate(targetZoom, thicknessTable);
-      textureData[pixelIdx + 1] = 0;
+      textureData[pixelIdx + 0] = thickness ? interpolate(targetZoom, thickness) : 1;
+      textureData[pixelIdx + 1] = opacity ? interpolate(targetZoom, opacity) : 1;
       textureData[pixelIdx + 2] = 0;
       textureData[pixelIdx + 3] = 1;
     }
@@ -2245,6 +2300,10 @@ async function init(canvas, size, viewArray) {
       renderPass.setPipeline(linePipeline);
       renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
+      renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
+      renderPass.setPipeline(borderPipeline);
+      renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);

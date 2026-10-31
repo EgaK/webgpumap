@@ -5,7 +5,6 @@ import earcut from "./util/earcut.dev";
 import style from "./style";
 
 export default async (zxy) => {
-  console.log("style on loadTile:", style);
   let propStructs = [];
   let polygonVertex = [];
   let polygonVertexBase = 0;
@@ -17,6 +16,10 @@ export default async (zxy) => {
 
   let lineVertex = []; // 幅付きライン専用の頂点配列
   let lineIndex = []; // 幅付きライン専用のインデックス配列
+
+  let thinVertex = [];
+  let thinIndex = [];
+  let thinIndexBase = 0;
 
   var d = await fetch("https://sasepo.com/t/" + zxy.join("/"));
   d = await new Pbf(await d.arrayBuffer());
@@ -43,6 +46,8 @@ export default async (zxy) => {
     borderIndex,
     lineVertex,
     lineIndex,
+    thinVertex,
+    thinIndex,
   };
 
   // リングが時計回り（外枠）かどうかを判定するヘルパー関数
@@ -61,7 +66,8 @@ export default async (zxy) => {
     var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
       var fillColor = prop.Color;
-      var strokeColor = [0.3, 0.3, 0.3, 1];
+      var opacity = prop.Opacity || 1.0;
+      var strokeColor = [0.3, 0.3, 0.3];
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
         // console.log("feature.type", feature.type, feature);
@@ -86,6 +92,7 @@ export default async (zxy) => {
                 fillColor,
                 strokeColor,
                 strokeThickness,
+                opacity,
               );
             }
             // 新しいポリゴンとして初期化
@@ -103,11 +110,13 @@ export default async (zxy) => {
             fillColor,
             strokeColor,
             strokeThickness,
+            opacity,
           );
         }
       }
     } else {
       var strokeColor = prop.Color;
+      var opacity = prop.Opacity || 1;
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
         // console.log("feature.type", feature.type, feature);
@@ -120,13 +129,35 @@ export default async (zxy) => {
           // 頂点の形式を mapboxのPointオブジェクト から [x, y] の配列形式に変換
           const formattedRing = ring.map((p) => [p.x, p.y]);
 
-          addPolyline(formattedRing, strokeColor, strokeThickness);
+          if (strokeThickness != 1) {
+            addPolyline(formattedRing, strokeColor, strokeThickness, opacity);
+          } else {
+            addThin(formattedRing, strokeColor, opacity);
+          }
         }
       }
     }
   }
 
-  function addPolygon(rings, fillColor, lineColor, strokeThickness) {
+  function addThin(points, color, opacity) {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const packed = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
+      thinVertex.push(packed, propStructs.length);
+      if (i < points.length - 1) {
+        thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
+      }
+    }
+    thinIndexBase += points.length;
+    propStructs.push({
+      fillColor: [1, 1, 1],
+      lineColor: color,
+      opacity,
+      thickness: 1,
+    });
+  }
+
+  function addPolygon(rings, fillColor, lineColor, strokeThickness, opacity) {
     // rings は [ outerLoop, innerHole1, innerHole2, ... ] という構造を想定
 
     const earcutRawData = []; // earcut用の一時的なフラット配列 [x1,y1, x2,y2, ...]
@@ -156,8 +187,8 @@ export default async (zxy) => {
         // 枠線（折れ線）用の処理
         // 外周だけでなく、すべてのリング（穴の輪郭含む）に対して個別に枠線を描画する
         if (strokeThickness > 0) {
-          borderIndex.push(borderIndexBase + i);
           borderIndex.push(
+            borderIndexBase + i,
             borderIndexBase + (i + 1 == ring.length ? 0 : i + 1),
           );
         }
@@ -177,6 +208,7 @@ export default async (zxy) => {
     propStructs.push({
       fillColor,
       lineColor,
+      opacity,
       thickness: strokeThickness,
     });
 
@@ -184,7 +216,7 @@ export default async (zxy) => {
     polygonVertexBase += currentVertexCount;
   }
 
-  function addPolyline(points, color, thickness) {
+  function addPolyline(points, color, thickness, opacity) {
     const numPoints = points.length;
     if (numPoints < 2) return;
 
@@ -231,8 +263,9 @@ export default async (zxy) => {
     }
 
     propStructs.push({
-      fillColor: [1, 1, 1, 0],
+      fillColor: [1, 1, 1],
       lineColor: color,
+      opacity,
       thickness: thickness,
     });
   }

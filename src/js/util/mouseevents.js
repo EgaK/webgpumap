@@ -28,6 +28,7 @@ export default (viewArray) => {
       }
       viewArray[2] = Math.max(0.1, Math.min(viewArray[2], 100.0)); // 制限
 
+      // console.log("zoom:", viewArray[2]);
       // マウス位置を中心に拡大するためのオフセット調整
       viewArray[0] += mouseX / oldZoom - mouseX / viewArray[2];
       viewArray[1] += mouseY / oldZoom - mouseY / viewArray[2];

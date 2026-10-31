@@ -54,8 +54,8 @@ async function init(canvas, size, viewArray) {
   context.configure({
     device,
     format: presentationFormat,
-    alphaMode: "opaque",
-    // alphaMode: "premultiplied",
+    // alphaMode: "opaque",
+    alphaMode: "premultiplied",
   });
 
   // ==========================================
@@ -263,38 +263,49 @@ async function init(canvas, size, viewArray) {
     return table[0][1];
   };
 
-  let styleTable = [];
+  let thicknessTable = [];
+  let opacityTable = [];
   for (const s of style) {
     if (Array.isArray(s.thickness)) {
-      styleTable.push({
-        thickness: s.thickness,
-      });
-      s.thickness = -styleTable.length;
+      thicknessTable.push(s.thickness);
+      s.thickness = -thicknessTable.length;
+    }
+    if (Array.isArray(s.OPacity)) {
+      opacityTable.push(s.OPacity);
+      s.OPacity = -opacityTable.length;
     }
   }
 
+  // console.log("style", style);
+
   const texWidth = 32;
-  const texHeight = 4; // 本来はstyleTable.length
+  const texHeight = 4; // 本来はstyleTable.lengthだけどWGSL内の値を動的に変えられないので固定
   const textureData = new Float16Array(texWidth * texHeight * 4);
   const minZoom = 0.0;
-  const maxZoom = 20.0;
+  const maxZoom = 100.0;
 
   for (let tableId = 0; tableId < texHeight; tableId++) {
-    const thicknessTable = styleTable[tableId]?.thickness;
-    if (!thicknessTable) break;
-    // const opacityTable = getOpacityTableForId(tableId);
+    const thickness = thicknessTable[tableId];
+    const opacity = opacityTable[tableId];
+    if (!thickness && !opacity) break;
 
     for (let i = 0; i < texWidth; i++) {
       const t = i / (texWidth - 1); // 0.0 〜 1.0
       const targetZoom = minZoom + t * (maxZoom - minZoom);
 
       const pixelIdx = (tableId * texWidth + i) * 4;
-      textureData[pixelIdx + 0] = interpolate(targetZoom, thicknessTable);
-      textureData[pixelIdx + 1] = 0; // interpolate(targetZoom, opacityTable);
+      textureData[pixelIdx + 0] = thickness
+        ? interpolate(targetZoom, thickness)
+        : 1.0;
+      textureData[pixelIdx + 1] = opacity
+        ? interpolate(targetZoom, opacity)
+        : 1.0;
       textureData[pixelIdx + 2] = 0.0;
       textureData[pixelIdx + 3] = 1.0;
     }
   }
+
+  // console.log("textureData", textureData);
 
   // WebGPU 2Dテクスチャの作成
   const styleTexture2D = device.createTexture({
@@ -427,6 +438,11 @@ async function init(canvas, size, viewArray) {
       renderPass.setPipeline(linePipeline);
       renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
+      // 細いポリライン
+      renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
+      renderPass.setPipeline(borderPipeline);
+      renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }
 
     renderPass.end();

@@ -9,8 +9,9 @@ struct PolylineVertex {
   // @location(3) offset_sign: f32, // ★新設：0.0（左）または 1.0（右）
 }
 struct Property {
-  fillColor: vec4f,
-  lineColor: vec4f,
+  fillColor: vec3f,
+  opacity: f32,
+  lineColor: vec3f,
   thickness: f32,
   // index_base: u32,  // これから下は使ってないので削除予定
   // index_count: u32,
@@ -56,6 +57,16 @@ fn raw_to_ndc(packed_val: u32) -> vec2f {
   return vec2f(normalized_x, normalized_y) * 2.0 - 1.0;
 }
 
+fn sheer(color:vec3f, opacity: f32) -> vec4f {
+  // if(opacity<0){
+  //   let v_coord = (-opacity - 0.5) / 4.0;
+  //   let uv = vec2f(uniforms.u_zoom, v_coord);
+  //   let sampled_data = textureSampleLevel(zoom_texture_2d, linear_sampler, uv, 0.0);
+  //   return vec4f(color, f32(sampled_data.g));
+  // }
+  return vec4f(color, 1.0);
+}
+
 @vertex
 fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
   var output: VertexOutput;
@@ -68,7 +79,7 @@ fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
   output.position = vec4f(cam_pos, z, 1.0);
 
   // 色などもプロパティから取得
-  output.color = prop.fillColor;
+  output.color = sheer(prop.fillColor, prop.opacity);
   return output;
 }
 
@@ -82,7 +93,7 @@ fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
   output.position = vec4f(cam_pos, z, 1.0);
 
   // 色などもプロパティから取得
-  output.color = prop.lineColor;
+  output.color = sheer(prop.lineColor, prop.opacity);
   return output;
 }
 
@@ -98,7 +109,7 @@ fn vs_polyline(
   var thickness = prop.thickness;
   if　(thickness<0)　{
     let v_coord = (-thickness - 0.5) / 4.0;
-    let uv = vec2f(uniforms.u_zoom/10, v_coord);
+    let uv = vec2f(uniforms.u_zoom/100, v_coord);
     let sampled_data = textureSampleLevel(zoom_texture_2d, linear_sampler, uv, 0.0);
     thickness = sampled_data.r;
   }
@@ -118,7 +129,7 @@ fn vs_polyline(
 
   var z = f32(input.feature_id + 1u) * 1e-6;
   output.position = vec4f(final_pos, z, 1.0);
-  output.color = prop.lineColor;
+  output.color = sheer(prop.lineColor, prop.opacity);
   return output;
 }
 

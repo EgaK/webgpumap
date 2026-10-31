@@ -3,11 +3,15 @@ export default [
     // 鉄道
     Type: "l",
     Layer: "t",
-    Color: [0.59, 0.59, 0.59, 1], //"150,150,150",
+    Color: [0.59, 0.59, 0.59], //"150,150,150",
     // Color: '969696',
     thickness: [
-      [10, 30],
-      [15, 100],
+      [10, 10],
+      [20, 100],
+    ],
+    OPacity: [
+      [0, 0.1],
+      [100, 1],
     ],
     // thickness: 5,
     // Dash: [30, 30],
@@ -20,7 +24,7 @@ export default [
     // 建物
     Type: "f",
     Layer: "b",
-    Color: [0.94, 0.96, 0.94, 1], //"240,245,240",
+    Color: [0.94, 0.96, 0.94], //"240,245,240",
     // Color: 'f0f5f0',
     // Color: '200,200,200',
     // thickness: 1,
@@ -32,7 +36,7 @@ export default [
     // 道路輪郭
     Type: "l",
     Layer: "r1",
-    Color: [0.39, 0.39, 0.39, 1], //"99,99,99",
+    Color: [0.39, 0.39, 0.39], //"99,99,99",
     // Color: '636363',
     thickness: 1,
     OPacity: [
@@ -44,19 +48,19 @@ export default [
     // 道路部品
     Type: "l",
     Layer: "r2",
-    Color: [0.77, 0.63, 0, 1], //"196,160,0",
+    Color: [0.77, 0.63, 0], //"196,160,0",
     // Color: 'c4a000',
     thickness: 1,
-    OPacity: [
-      [16, 0],
-      [17, 1],
-    ],
+    // OPacity: [
+    //   [16, 0],
+    //   [17, 1],
+    // ],
   },
   {
     // その他の道路
     Type: "f",
     Layer: "r5",
-    Color: [1, 1, 1, 1],
+    Color: [1, 1, 1],
     // Color: 'ffffff',
   },
 
@@ -64,14 +68,14 @@ export default [
     // 高速
     Type: "f",
     Layer: "r3",
-    Color: [1, 0.77, 0.6, 1], //"255,197,153",
+    Color: [1, 0.77, 0.6], //"255,197,153",
     // Color: 'ffc599',
   },
   {
     // 高速 // Zoom13以下のとき
     Type: "l",
     Layer: "r8",
-    Color: [1, 0.77, 0.6, 1], //"255,197,153",
+    Color: [1, 0.77, 0.6], //"255,197,153",
     // Color: 'ffc599',
     // thickness: 1,
     // OPacity: [
@@ -87,19 +91,19 @@ export default [
     // 国道
     Type: "f",
     Layer: "r4",
-    Color: [0.93, 0.86, 0.58, 1], //"239,220,148",
+    Color: [0.93, 0.86, 0.58], //"239,220,148",
     // Color: 'efdc94',
   },
   {
     // 国道 // Zoom13以下のとき
     Type: "l",
     Layer: "r9",
-    Color: [0.93, 0.86, 0.58, 1], //"239,220,148",
+    Color: [0.93, 0.86, 0.58], //"239,220,148",
     // Color: 'efdc94',
     // thickness: 1,
     // OPacity: [
     // 	[10, 0],
-    // 	[12, 1],
+    // 	[12],
     // ],
     thickness: [
       [10, 5],
@@ -120,7 +124,7 @@ export default [
     // 水域
     Type: "f",
     Layer: "w",
-    Color: [0.66, 0.86, 1, 1], //"170,221,255",
+    Color: [0.66, 0.86, 1], //"170,221,255",
     // Color: 'aaddff',
   },
 
@@ -128,7 +132,7 @@ export default [
     // 緑
     Type: "f",
     Layer: "g",
-    Color: [0.8, 0.93, 0.66, 1], //"204,238,170",
+    Color: [0.8, 0.93, 0.66], //"204,238,170",
     // Color: 'cceeaa',
   },
 
@@ -137,7 +141,7 @@ export default [
     Type: "p",
     Layer: "c",
     // text: "name",
-    Color: [0.4, 0.4, 0.4, 1], //"102,102,102",
+    Color: [0.4, 0.4, 0.4], //"102,102,102",
     // Color: '666666',
     Size: 14,
     Padding: 10,
@@ -174,7 +178,7 @@ export default [
     Type: "p",
     Layer: "d",
     // text: "name",
-    Color: [0.4, 0.4, 0.4, 1], //"102,102,102",
+    Color: [0.4, 0.4, 0.4], //"102,102,102",
     // Color: '666666',
     Size: 12,
     // Padding: 10,

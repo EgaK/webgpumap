@@ -1,6 +1,6 @@
 export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   // そのタイル固有のpropertyBuffer（GPUバッファ）を作成・転送
-  let STRIDE = 48; // propStructs は1要素48バイト
+  let STRIDE = 32; // propStructs は1要素48バイト
   const propertyBufferSize = tileData.propStructs.length * STRIDE;
   const propertyBuffer = device.createBuffer({
     size: propertyBufferSize,
@@ -11,6 +11,7 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     const offset = i * STRIDE;
     const buf1 = new Float32Array([
       ...cmd.fillColor,
+      cmd.opacity,
       ...cmd.lineColor,
       cmd.thickness,
     ]);
@@ -70,6 +71,20 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   const lineIndexData = new Uint32Array(tileData.lineIndex);
   device.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
 
+  const thinVertexBuffer = device.createBuffer({
+    size: tileData.thinVertex.length * 8,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+  const thinVertexData = new Uint32Array(tileData.thinVertex);
+  device.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
+
+  const thinIndexBuffer = device.createBuffer({
+    size: tileData.thinIndex.length * 4,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+  });
+  const thinIndexData = new Uint32Array(tileData.thinIndex);
+  device.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
+
   // そのタイル固有のBindGroup（グループ1の実体）を作成
   const bindGroup = device.createBindGroup({
     layout: tileBindGroupLayout, // グループ1の設計図を指定
@@ -90,5 +105,8 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
     lineVertexBuffer,
     lineIndexBuffer,
     lineIndexCount: tileData.lineIndex.length,
+    thinVertexBuffer,
+    thinIndexBuffer,
+    thinIndexCount: tileData.thinIndex.length,
   };
 }

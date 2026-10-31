@@ -17,7 +17,7 @@ canvas[0].height = 1200;
 canvas.css({ width: 400 + "px", height: 400 + "px" });
 const offcanvas = canvas[0].transferControlToOffscreen();
 
-const worker = new Worker("/js/worker.js");
+const worker = new Worker("/js/worker.min.js");
 worker.postMessage({ "c": offcanvas, "s": [800, 800], "b": sab }, [offcanvas]);
 
 // const canvas = document.getElementById("a");

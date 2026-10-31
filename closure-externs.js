@@ -61,3 +61,7 @@ GPUShaderStage.FRAGMENT;
 var GPUTextureUsage = {};
 /** @type {number} */
 GPUTextureUsage.RENDER_ATTACHMENT;
+/** @type {number} */
+GPUTextureUsage.TEXTURE_BINDING;
+/** @type {number} */
+GPUTextureUsage.COPY_DST;
