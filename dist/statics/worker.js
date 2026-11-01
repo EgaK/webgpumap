@@ -1,5 +1,5 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Uniforms{u_offset:vec2f,u_zoom:f32,u_scale:f32,u_res_x:f32,u_res_y:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var zoom_texture_2d:texture_2d<f32>;@group(0)@binding(2)var linear_sampler:sampler;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,opacity:f32)->vec4f{return vec4f(color,1.0);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var thickness=prop.thickness;if(thickness<0){let v_coord=(-thickness-0.5)/4.0;let uv=vec2f(uniforms.u_scale,v_coord);let sampled_data=textureSampleLevel(zoom_texture_2d,linear_sampler,uv,0.0);thickness=sampled_data.r;}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Style{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{u_mvp_matrix:mat4x4<f32>,u_offset:vec2<f32>,u_zoom:f32,u_scale:f32,u_res_x:f32,u_res_y:f32,u_tile_z:u32,u_tile_x:u32,u_tile_y:u32,u_tile_extent:f32,u_tile_opacity:f32,pad0:f32,pad1:f32,pad2:f32,pad3:f32,pad4:f32,styles:array<Style,8>,};@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.styles[u32(-opacity-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var thickness=prop.thickness;if(thickness<0){let style=uniforms.styles[u32(-thickness-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}`;
 
 // src/js/util/earcut.dev.js
 var steiners = /* @__PURE__ */ new Set();
@@ -1489,11 +1489,6 @@ var readUtf8 = (buf, pos, end) => {
   return str;
 };
 
-// src/js/util/calc.js
-var scale = (z) => {
-  return Math.pow(2, z) * 3e-5;
-};
-
 // src/js/style.js
 var style_default = [
   {
@@ -1504,12 +1499,8 @@ var style_default = [
     //"150,150,150",
     // Color: '969696',
     thickness: [
-      [scale(15), 10],
-      [scale(18), 100]
-    ],
-    OPacity: [
-      [scale(15), 0.1],
-      [scale(18), 1]
+      [15, 10],
+      [18, 100]
     ]
     // thickness: 5,
     // Dash: [30, 30],
@@ -1527,7 +1518,11 @@ var style_default = [
     // Color: 'f0f5f0',
     // Color: '200,200,200',
     // thickness: 1,
-    thickness: 1
+    thickness: 1,
+    OPacity: [
+      [14, 0],
+      [17, 1]
+    ]
     // OPacity: .5,
   },
   {
@@ -1610,7 +1605,6 @@ var style_default = [
     // ],
     thickness: [
       [10, 5],
-      [13, 10],
       [16, 30]
     ]
   },
@@ -1721,7 +1715,7 @@ var loadTile_default = async (zxy) => {
   let thinVertex = [];
   let thinIndex = [];
   let thinIndexBase = 0;
-  var d = await fetch("https://sasepo.com/t/" + zxy.join("/"));
+  var d = await fetch("https://192.168.11.2/t/" + zxy.join("/"));
   d = await new Pbf(await d.arrayBuffer());
   var layers = new VectorTile(d).layers;
   for (var n = style_default.length; n--; ) {
@@ -1758,7 +1752,7 @@ var loadTile_default = async (zxy) => {
     var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
       var fillColor = prop.Color;
-      var opacity = prop.Opacity || 1;
+      var opacity = prop.OPacity || 1;
       var strokeColor = [0.3, 0.3, 0.3];
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
@@ -1795,7 +1789,7 @@ var loadTile_default = async (zxy) => {
       }
     } else {
       var strokeColor = prop.Color;
-      var opacity = prop.Opacity || 1;
+      var opacity = prop.OPacity || 1;
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
         if (feature.type !== 2) continue;
@@ -1913,6 +1907,11 @@ var loadTile_default = async (zxy) => {
   }
 };
 
+// src/js/util/calc.js
+var scale = (z) => {
+  return Math.pow(2, z) * 3e-5;
+};
+
 // src/js/worker.js
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -1964,18 +1963,7 @@ async function init(canvas, size, viewArray) {
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }
         // Uniformバッファが入りますよという宣言
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        texture: { sampleType: "float", viewDimension: "2d" }
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.VERTEX,
-        sampler: { type: "filtering" }
       }
-      // ★サンプラーの枠
     ]
   });
   const tileBindGroupLayout = device.createBindGroupLayout({
@@ -1995,6 +1983,28 @@ async function init(canvas, size, viewArray) {
     ]
   });
   const shaderModule = device.createShaderModule({ code: shader_default });
+  const fragment = {
+    module: shaderModule,
+    entryPoint: "fs_main",
+    targets: [
+      {
+        format: presentationFormat,
+        // 以下の blend 設定を追加・変更する
+        blend: {
+          color: {
+            srcFactor: "src-alpha",
+            dstFactor: "one-minus-src-alpha",
+            operation: "add"
+          },
+          alpha: {
+            srcFactor: "one",
+            dstFactor: "one-minus-src-alpha",
+            operation: "add"
+          }
+        }
+      }
+    ]
+  };
   const polygonPipeline = device.createRenderPipeline({
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device.createPipelineLayout({
@@ -2022,11 +2032,7 @@ async function init(canvas, size, viewArray) {
         }
       ]
     },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }]
-    },
+    fragment,
     primitive: { topology: "triangle-list" },
     depthStencil: {
       format: "depth24plus",
@@ -2066,11 +2072,7 @@ async function init(canvas, size, viewArray) {
         }
       ]
     },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }]
-    },
+    fragment,
     primitive: { topology: "line-list" },
     depthStencil: {
       format: "depth24plus",
@@ -2120,11 +2122,7 @@ async function init(canvas, size, viewArray) {
         }
       ]
     },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }]
-    },
+    fragment,
     primitive: { topology: "triangle-list" },
     depthStencil: {
       format: "depth24plus",
@@ -2141,121 +2139,62 @@ async function init(canvas, size, viewArray) {
     const compilationInfo = await shaderModule.getCompilationInfo();
     for (const message of compilationInfo.messages) {
       console.error(
-        `WGSL Error: ${message.message} at line ${message.lineNum}`
+        `WGSL \u30A8\u30E9\u30FC: ${message.message} at line ${message.lineNum}`
       );
     }
   }
-  const interpolate = (zoom, table) => {
-    if (zoom <= table[0][0]) return table[0][1];
-    if (zoom >= table[table.length - 1][0]) return table[table.length - 1][1];
-    for (let i = 0; i < table.length - 1; i++) {
-      const p0 = table[i], p1 = table[i + 1];
-      if (zoom >= p0[0] && zoom <= p1[0]) {
-        const t = (zoom - p0[0]) / (p1[0] - p0[0]);
-        return p0[1] + (p1[1] - p0[1]) * t;
-      }
-    }
-    return table[0][1];
-  };
-  let thicknessTable = [];
-  let opacityTable = [];
-  for (const s of style_default) {
-    if (Array.isArray(s.thickness)) {
-      thicknessTable.push(s.thickness);
-      s.thickness = -thicknessTable.length;
-    }
-    if (Array.isArray(s.OPacity)) {
-      opacityTable.push(s.OPacity);
-      s.OPacity = -opacityTable.length;
-    }
-  }
-  const texWidth = 32;
-  const texHeight = 4;
-  const textureData = new Float16Array(texWidth * texHeight * 4);
-  const minZoom = 10;
-  const maxZoom = 20;
-  for (let tableId = 0; tableId < texHeight; tableId++) {
-    const thickness = thicknessTable[tableId];
-    const opacity = opacityTable[tableId];
-    if (!thickness && !opacity) break;
-    for (let i = 0; i < texWidth; i++) {
-      const t = i / (texWidth - 1);
-      const targetZoom = Math.pow(2, minZoom + t * (maxZoom - minZoom)) * 3e-5;
-      const pixelIdx = (tableId * texWidth + i) * 4;
-      textureData[pixelIdx + 0] = thickness ? interpolate(targetZoom, thickness) : 1;
-      textureData[pixelIdx + 1] = opacity ? interpolate(targetZoom, opacity) : 1;
-      textureData[pixelIdx + 2] = 0;
-      textureData[pixelIdx + 3] = 1;
-    }
-  }
-  console.log("textureData", textureData);
-  const styleTexture2D = device.createTexture({
-    size: [texWidth, texHeight, 1],
-    // 高さを 16 に
-    dimension: "2d",
-    // 2d に変更
-    format: "rgba16float",
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
-  });
-  device.queue.writeTexture(
-    { texture: styleTexture2D },
-    textureData,
-    { bytesPerRow: texWidth * 8 },
-    // ★ 幅16 * 8バイト = 128バイト
-    [texWidth, texHeight, 1]
-  );
-  const linearSampler = device.createSampler({
-    magFilter: "linear",
-    minFilter: "linear",
-    addressModeU: "clamp-to-edge"
-    // 範囲外(0未満や1超)のズームは端点の色を固定
-  });
   const uniformBuffer = device.createBuffer({
-    size: 32,
+    size: 256,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
+  let styleTable = [];
+  for (const s of style_default) {
+    if (Array.isArray(s.thickness)) {
+      styleTable.push(...s.thickness.flat());
+      s.thickness = -(~~styleTable.length / 4);
+    }
+    if (Array.isArray(s.OPacity)) {
+      styleTable.push(...s.OPacity.flat());
+      s.OPacity = -(~~styleTable.length / 4);
+    }
+  }
+  console.log("style", styleTable, style_default);
+  device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
   const globalBindGroup = device.createBindGroup({
     layout: commonBindGroupLayout,
     // グループ0の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 0, resource: { buffer: uniformBuffer } }
       // 実体バッファ
-      { binding: 1, resource: styleTexture2D.createView() },
-      { binding: 2, resource: linearSampler }
-      // ★ここで使用します！
     ]
   });
   var tileData = await loadTile_default([15, 28191, 13180]);
   console.log("tileData", tileData);
   const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
   console.log("tiles", visibleTiles);
-  function updateUniforms() {
+  function updateCamera() {
     device.queue.writeBuffer(
       uniformBuffer,
-      0,
+      64,
       new Float32Array([
         viewArray[0],
         viewArray[1],
         viewArray[2],
         scale(viewArray[2])
         //flagはシェーダでは必要ないのでscaleとして使用する
-      ]).buffer,
-      0,
-      // 開始位置
-      16
-      // 16バイト分 (f32 x 4要素分)
+      ])
     );
   }
-  function updateUniforms2() {
+  function updateCanvasSize() {
     device.queue.writeBuffer(
       uniformBuffer,
-      16,
+      80,
       // 後半の16バイトの位置から書き込み
       new Float32Array([canvas.width, canvas.height])
     );
   }
-  updateUniforms();
-  updateUniforms2();
+  updateCamera();
+  updateCanvasSize();
   const msaaColorTexture = device.createTexture({
     size: [canvas.width, canvas.height],
     sampleCount: 4,
@@ -2273,7 +2212,7 @@ async function init(canvas, size, viewArray) {
   function render() {
     requestAnimationFrame(render);
     if (!viewArray[3]) return;
-    updateUniforms();
+    updateCamera();
     const commandEncoder = device.createCommandEncoder();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [

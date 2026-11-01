@@ -1,5 +1,7 @@
+import { scale } from "./calc";
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
+let scaleZ = scale(16);
 
 export default (viewArray) => {
   const canvas = document.getElementById("a");
@@ -25,7 +27,7 @@ export default (viewArray) => {
       const mouseY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
 
       const zoomFactor = 1.1;
-      const oldZoom = viewArray[2];
+      const oldScale = scaleZ;
 
       // if (e.deltaY < 0) {
       //   viewArray[2] *= zoomFactor;
@@ -41,10 +43,11 @@ export default (viewArray) => {
       if (viewArray[2] == z) return;
 
       viewArray[2] = z;
+      scaleZ = scale(z);
 
       // マウス位置を中心に拡大するためのオフセット調整
-      viewArray[0] += mouseX / oldZoom - mouseX / viewArray[2];
-      viewArray[1] += mouseY / oldZoom - mouseY / viewArray[2];
+      viewArray[0] += mouseX / oldScale - mouseX / scaleZ;
+      viewArray[1] += mouseY / oldScale - mouseY / scaleZ;
 
       viewArray[3] = 1;
       // updateUniforms();
@@ -74,8 +77,8 @@ export default (viewArray) => {
       -(deltaY / canvas.height) * 2 * (canvas.height / window.innerHeight);
 
     // ズーム倍率に応じて移動量を調整
-    viewArray[0] -= ndcX / viewArray[2];
-    viewArray[1] -= ndcY / viewArray[2];
+    viewArray[0] -= ndcX / scaleZ;
+    viewArray[1] -= ndcY / scaleZ;
 
     previousMousePosition = { x: e.clientX, y: e.clientY };
 

@@ -21,7 +21,7 @@ export default async (zxy) => {
   let thinIndex = [];
   let thinIndexBase = 0;
 
-  var d = await fetch("https://sasepo.com/t/" + zxy.join("/"));
+  var d = await fetch("https://192.168.11.2/t/" + zxy.join("/"));
   d = await new Pbf(await d.arrayBuffer());
   var layers = new VectorTile(d).layers;
   for (var n = style.length; n--;) {
@@ -66,7 +66,7 @@ export default async (zxy) => {
     var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
       var fillColor = prop.Color;
-      var opacity = prop.Opacity || 1.0;
+      var opacity = prop.OPacity || 1.0;
       var strokeColor = [0.3, 0.3, 0.3];
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
@@ -116,7 +116,7 @@ export default async (zxy) => {
       }
     } else {
       var strokeColor = prop.Color;
-      var opacity = prop.Opacity || 1;
+      var opacity = prop.OPacity || 1;
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
         // console.log("feature.type", feature.type, feature);

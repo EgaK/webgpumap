@@ -1,5 +1,3 @@
-import { scale } from "./util/calc";
-
 export default [
   {
     // 鉄道
@@ -8,12 +6,8 @@ export default [
     Color: [0.59, 0.59, 0.59], //"150,150,150",
     // Color: '969696',
     thickness: [
-      [scale(15), 10],
-      [scale(18), 100],
-    ],
-    OPacity: [
-      [scale(15), 0.1],
-      [scale(18), 1],
+      [15, 10],
+      [18, 100],
     ],
     // thickness: 5,
     // Dash: [30, 30],
@@ -31,6 +25,10 @@ export default [
     // Color: '200,200,200',
     // thickness: 1,
     thickness: 1,
+    OPacity: [
+      [14, 0],
+      [17, 1],
+    ],
     // OPacity: .5,
   },
 
@@ -109,7 +107,6 @@ export default [
     // ],
     thickness: [
       [10, 5],
-      [13, 10],
       [16, 30],
     ],
   },

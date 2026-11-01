@@ -71,16 +71,6 @@ async function init(canvas, size, viewArray) {
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
       },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        texture: { sampleType: "float", viewDimension: "2d" },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.VERTEX,
-        sampler: { type: "filtering" },
-      }, // ★サンプラーの枠
     ],
   });
 
@@ -104,6 +94,29 @@ async function init(canvas, size, viewArray) {
   // 2. 設計図を元に パイプライン を作成する
   // ==========================================
   const shaderModule = device.createShaderModule({ code: shaderCode });
+
+  const fragment = {
+    module: shaderModule,
+    entryPoint: "fs_main",
+    targets: [
+      {
+        format: presentationFormat,
+        // 以下の blend 設定を追加・変更する
+        blend: {
+          color: {
+            srcFactor: "src-alpha",
+            dstFactor: "one-minus-src-alpha",
+            operation: "add",
+          },
+          alpha: {
+            srcFactor: "one",
+            dstFactor: "one-minus-src-alpha",
+            operation: "add",
+          },
+        },
+      },
+    ],
+  };
 
   const polygonPipeline = device.createRenderPipeline({
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
@@ -132,11 +145,7 @@ async function init(canvas, size, viewArray) {
         },
       ],
     },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }],
-    },
+    fragment: fragment,
     primitive: { topology: "triangle-list" },
     depthStencil: {
       format: "depth24plus",
@@ -175,11 +184,7 @@ async function init(canvas, size, viewArray) {
         },
       ],
     },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }],
-    },
+    fragment: fragment,
     primitive: { topology: "line-list" },
     depthStencil: {
       format: "depth24plus",
@@ -228,11 +233,7 @@ async function init(canvas, size, viewArray) {
         },
       ],
     },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_main",
-      targets: [{ format: presentationFormat }],
-    },
+    fragment: fragment,
     primitive: { topology: "triangle-list" },
     depthStencil: {
       format: "depth24plus",
@@ -248,97 +249,31 @@ async function init(canvas, size, viewArray) {
     const compilationInfo = await shaderModule.getCompilationInfo();
     for (const message of compilationInfo.messages) {
       console.error(
-        `WGSL Error: ${message.message} at line ${message.lineNum}`,
+        `WGSL エラー: ${message.message} at line ${message.lineNum}`,
       );
     }
   }
 
-  const interpolate = (zoom, table) => {
-    if (zoom <= table[0][0]) return table[0][1];
-    if (zoom >= table[table.length - 1][0]) return table[table.length - 1][1];
-    for (let i = 0; i < table.length - 1; i++) {
-      const p0 = table[i],
-        p1 = table[i + 1];
-      if (zoom >= p0[0] && zoom <= p1[0]) {
-        const t = (zoom - p0[0]) / (p1[0] - p0[0]);
-        return p0[1] + (p1[1] - p0[1]) * t; // 線形補間
-      }
-    }
-    return table[0][1];
-  };
-
-  let thicknessTable = [];
-  let opacityTable = [];
-  for (const s of style) {
-    if (Array.isArray(s.thickness)) {
-      thicknessTable.push(s.thickness);
-      s.thickness = -thicknessTable.length;
-    }
-    if (Array.isArray(s.OPacity)) {
-      opacityTable.push(s.OPacity);
-      s.OPacity = -opacityTable.length;
-    }
-  }
-
-  // console.log("style", style);
-
-  const texWidth = 32;
-  const texHeight = 4; // 本来はstyleTable.lengthだけどWGSL内の値を動的に変えられないので固定
-  const textureData = new Float16Array(texWidth * texHeight * 4);
-  const minZoom = 10;
-  const maxZoom = 20;
-
-  for (let tableId = 0; tableId < texHeight; tableId++) {
-    const thickness = thicknessTable[tableId];
-    const opacity = opacityTable[tableId];
-    if (!thickness && !opacity) break;
-
-    for (let i = 0; i < texWidth; i++) {
-      const t = i / (texWidth - 1);
-      const targetZoom = Math.pow(2, minZoom + t * (maxZoom - minZoom)) * 3e-5;
-      // console.log("targetZoom", targetZoom);
-
-      const pixelIdx = (tableId * texWidth + i) * 4;
-      textureData[pixelIdx + 0] = thickness
-        ? interpolate(targetZoom, thickness)
-        : 1.0;
-      textureData[pixelIdx + 1] = opacity
-        ? interpolate(targetZoom, opacity)
-        : 1.0;
-      textureData[pixelIdx + 2] = 0.0;
-      textureData[pixelIdx + 3] = 1.0;
-    }
-  }
-
-  console.log("textureData", textureData);
-
-  // WebGPU 2Dテクスチャの作成
-  const styleTexture2D = device.createTexture({
-    size: [texWidth, texHeight, 1], // 高さを 16 に
-    dimension: "2d", // 2d に変更
-    format: "rgba16float",
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-  });
-
-  // データの転送
-  device.queue.writeTexture(
-    { texture: styleTexture2D },
-    textureData,
-    { bytesPerRow: texWidth * 8 }, // ★ 幅16 * 8バイト = 128バイト
-    [texWidth, texHeight, 1],
-  );
-
-  // 2. バイリニア（線形）補間を行うサンプラーの作成（★ここが最重要！）
-  const linearSampler = device.createSampler({
-    magFilter: "linear",
-    minFilter: "linear",
-    addressModeU: "clamp-to-edge", // 範囲外(0未満や1超)のズームは端点の色を固定
-  });
-
   const uniformBuffer = device.createBuffer({
-    size: 32,
+    size: 256,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
+
+  let styleTable = [];
+  for (const s of style) {
+    if (Array.isArray(s.thickness)) {
+      styleTable.push(...s.thickness.flat());
+      s.thickness = -(~~styleTable.length / 4);
+    }
+    if (Array.isArray(s.OPacity)) {
+      styleTable.push(...s.OPacity.flat());
+      s.OPacity = -(~~styleTable.length / 4);
+    }
+  }
+
+  console.log("style", styleTable, style);
+
+  device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
 
   // ==========================================
   // 3. 設計図（共通レイアウト）に、実際の一時バッファを紐付ける
@@ -348,8 +283,6 @@ async function init(canvas, size, viewArray) {
     layout: commonBindGroupLayout, // グループ0の設計図を指定
     entries: [
       { binding: 0, resource: { buffer: uniformBuffer } }, // 実体バッファ
-      { binding: 1, resource: styleTexture2D.createView() },
-      { binding: 2, resource: linearSampler }, // ★ここで使用します！
     ],
   });
 
@@ -360,32 +293,30 @@ async function init(canvas, size, viewArray) {
   const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
   console.log("tiles", visibleTiles);
   // ユニフォームバッファを更新する関数を作成
-  function updateUniforms() {
+  function updateCamera() {
     // 1. offsetとzoom, flagw（16バイト分）を、GPUバッファの先頭（オフセット0）に直接転送
 
     device.queue.writeBuffer(
       uniformBuffer,
-      0,
+      64,
       new Float32Array([
         viewArray[0],
         viewArray[1],
         viewArray[2],
         scale(viewArray[2]), //flagはシェーダでは必要ないのでscaleとして使用する
-      ]).buffer,
-      0, // 開始位置
-      16, // 16バイト分 (f32 x 4要素分)
+      ]),
     );
   }
-  function updateUniforms2() {
+  function updateCanvasSize() {
     device.queue.writeBuffer(
       uniformBuffer,
-      16, // 後半の16バイトの位置から書き込み
+      80, // 後半の16バイトの位置から書き込み
       new Float32Array([canvas.width, canvas.height]),
     );
   }
 
-  updateUniforms();
-  updateUniforms2();
+  updateCamera();
+  updateCanvasSize();
 
   // 1. MSAA用のカラーテクスチャ（4倍サンプリング）
   const msaaColorTexture = device.createTexture({
@@ -406,7 +337,7 @@ async function init(canvas, size, viewArray) {
   function render() {
     requestAnimationFrame(render);
     if (!viewArray[3]) return;
-    updateUniforms();
+    updateCamera();
     const commandEncoder = device.createCommandEncoder();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [

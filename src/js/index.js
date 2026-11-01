@@ -1,6 +1,6 @@
 import $ from "./util/tiny";
 import mouseevents from "./util/mouseevents";
-import loadTile from "./loadTile";
+// import loadTile from "./loadTile";
 
 const sab = new SharedArrayBuffer(16);
 const viewArray = new Float32Array(sab);
@@ -17,15 +17,13 @@ canvas[0].height = 1200;
 canvas.css({ width: 400 + "px", height: 400 + "px" });
 const offcanvas = canvas[0].transferControlToOffscreen();
 
-const blob = new Blob([WORKER_CODE], { type: "application/javascript" });
-const workerUrl = URL.createObjectURL(blob);
+// const blob = new Blob([WORKER_CODE], { type: "application/javascript" });
+// const workerUrl = URL.createObjectURL(blob);
+// const worker = new Worker(workerUrl);
 
-// 3. Workerを生成
-const worker = new Worker(workerUrl);
-// const worker = new Worker("/js/worker.min.js");
+const worker = new Worker("/js/worker.js");
 worker.postMessage({ "c": offcanvas, "s": [800, 800], "b": sab }, [offcanvas]);
 
-console.log("test build");
 // const canvas = document.getElementById("a");
 // const offcanvas = canvas.transferControlToOffscreen();
 //

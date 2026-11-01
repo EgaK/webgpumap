@@ -149,107 +149,99 @@ async function jsBuild() {
     // 🚀 本番モード（2ステップ・ビルド）
     // ==========================================
 
-    // 1-1. WorkerのTSをesbuildでJSにバンドル
     await esbuild.build({
-      entryPoints: ["src/my-worker.ts"],
+      entryPoints: {
+        "worker": "src/js/worker.js",
+      },
       bundle: true,
-      outfile: "dist/tmp/worker.raw.js",
+      outdir: "dist/statics",
       format: "esm",
-      target: "es2022",
-      define: { "DEVELOP": "0" },
+      target: "es2020",
+      define: {
+        "DEVELOP": "true",
+        "WORKERCODE": "0",
+      },
+      plugins: [
+        glsl({
+          minify: true, // ★ WGSL/GLSLファイルをインポート時に自動でMinifyする
+        }),
+      ],
     });
 
-    // 1-2. WorkerのJSをClosure Compiler Advancedに通す
-    // ★ここでメインコードと同じリネーム規則（同じ型定義・共通ルール）が適用されるようにします
+    // あえてworkerとindexを別にコンパイルしてプロパティ名圧縮で対策してないと問題がおきるようにしてる
     await runClosure([
       "--compilation_level",
       "ADVANCED_OPTIMIZATIONS",
       "--language_in",
-      "ECMASCRIPT_2022",
+      "ECMASCRIPT_2020",
       "--language_out",
-      "ECMASCRIPT_2022",
-      "--define",
-      "DEVELOP=",
+      "ECMASCRIPT_2020",
       "--js",
-      "dist/tmp/worker.raw.js",
+      "dist/statics/worker.js",
       "--js_output_file",
-      "dist/tmp/worker.min.js",
+      "dist/statics/worker.min.js",
+      "--create_source_map",
+      "dist/statics/worker.map",
+      "--source_map_location_mapping",
+      "'dist/statics/|/'",
+      "--output_wrapper",
+      "'%output%//# sourceMappingURL=/worker.map'",
+      "--externs",
+      "closure-externs.js",
+      "--warning_level",
+      "QUIET",
     ]);
 
-    // 1-3. 圧縮されたWorkerのコード（文字列）を読み込む
     const minifiedWorkerCode = fs.readFileSync(
-      "dist/tmp/worker.min.js",
+      "dist/statics/worker.min.js",
       "utf8",
     );
 
-    console.log(
-      "ステップ 2: メインコードのコンパイルとWorkerのインライン化...",
-    );
-
-    // 2-1. esbuildでメインコードをバンドル
-    // この際、esbuildの `define` を使って、コード内の `WORKER_CODE` という定数を
-    // 先ほど圧縮したWorkerの「文字列データ」に直接置き換えます。
-    const result = await esbuild.build({
+    await esbuild.build({
       entryPoints: {
-        "base": "src/base.ts",
-        "edit": "src/edit.ts",
-        "admin": "src/admin.ts",
+        "index": "src/js/index.js",
       },
       bundle: true,
-      write: true,
-      outdir: "dist/tmp/main",
+      outdir: "dist/statics",
       format: "esm",
-      metafile: true,
-      target: "es2022",
+      target: "es2020",
       define: {
-        "DEVELOP": "0",
-        // Workerのソースコードを文字列リテラルとして丸ごと注入
+        "DEVELOP": "true",
         "WORKER_CODE": JSON.stringify(minifiedWorkerCode),
       },
+      plugins: [
+        glsl({
+          minify: true, // ★ WGSL/GLSLファイルをインポート時に自動でMinifyする
+        }),
+      ],
     });
 
-    // 2-2. メインコードの Closure Compiler 実行（引数自動組み立て）
-    const outputs = result.metafile.outputs;
-    const chunkArgs = [];
-    const jsFiles = [];
-    const chunkConfig = {
-      "base": { parent: null },
-      "edit": { parent: "base" },
-      "admin": { parent: "edit" },
-    };
-
-    Object.keys(chunkConfig).forEach((name) => {
-      const config = chunkConfig[name];
-      const actualFile = Object.keys(outputs).find((p) =>
-        p.endsWith(`${name}.js`),
-      );
-      if (!actualFile) return;
-      jsFiles.push("--js", actualFile);
-      let chunkStr = `${name}:1`;
-      if (config.parent) chunkStr += `:${config.parent}`;
-      chunkArgs.push("--chunk", chunkStr);
-    });
-
-    // メインのClosure実行引数
-    const closureArgs = [
+    await runClosure([
       "--compilation_level",
       "ADVANCED_OPTIMIZATIONS",
       "--language_in",
-      "ECMASCRIPT_2022",
+      "ECMASCRIPT_2020",
       "--language_out",
-      "ECMASCRIPT_2022",
-      "--define",
-      "DEVELOP=0",
-      ...jsFiles,
-      ...chunkArgs,
-      "--chunk_output_path_prefix",
-      "dist/js/",
-    ];
-
-    await runClosure(closureArgs);
+      "ECMASCRIPT_2020",
+      "--js",
+      "dist/statics/index.js",
+      "--js_output_file",
+      "dist/statics/index.min.js",
+      "--create_source_map",
+      "dist/statics/index.map",
+      "--source_map_location_mapping",
+      "'dist/statics/|/'",
+      "--output_wrapper",
+      "'%output%//# sourceMappingURL=/index.map'",
+      "--externs",
+      "closure-externs.js",
+      "--warning_level",
+      "QUIET",
+    ]);
 
     // 一時ファイルのクリーンアップ
     // fs.rmSync("dist/tmp", { recursive: true, force: true });
+
     log(`\u001b[35mbuild Javascript\u001b[0m ${Date.now() - startT}ms`);
   }
 }

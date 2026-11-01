@@ -18,17 +18,35 @@ struct Property {
   // vertex_base: u32,
 }
 
+struct Style {
+  min_zoom: f32,
+  min_val: f32,
+  max_zoom: f32,
+  max_val: f32,
+};
+
 struct Uniforms {
-  u_offset: vec2f,         // 8バイト (オフセット: 0)  <- viewArray[0], [1]
-  u_zoom: f32,             // 4バイト (オフセット: 8)  <- viewArray[2]
-  u_scale: f32,             // 更新フラグ（必要ないけどpaddingのため配置）
-  u_res_x: f32,            // 16 〜 19 バイト (canvas.width)
-  u_res_y: f32,            // 20 〜 23 バイト (canvas.height)
-}
+    u_mvp_matrix: mat4x4<f32>,   // 64バイト (0〜63)
+    u_offset: vec2<f32>,         // 8バイト (64〜71)
+    u_zoom: f32,                 // 4バイト (72〜75)
+    u_scale: f32,                // 4バイト (76〜79)
+    u_res_x: f32,                // 4バイト (80〜83)
+    u_res_y: f32,                // 4バイト (84〜87)
+    u_tile_z: u32,               // 4バイト (88〜91)
+    u_tile_x: u32,               // 4バイト (92〜95)
+    u_tile_y: u32,               // 4バイト (96〜99)
+    u_tile_extent: f32,          // 4バイト (100〜103)  現在は4096の固定値だけど念のため
+    // ズームイン・アウトでタイルが切り替わる際、新しいタイルが「パッ」と突然現れるとチカチカして見栄えが悪くなります。多くの地図アプリは、新しいタイルを 0.2 秒ほどかけてフワッとフェードインさせています。そのための変数u_tile_opacity
+    u_tile_opacity: f32,         // 4バイト (104〜107)
+
+    // --- パディングで256バイトのキリの良い位置（128バイト目など）に調整 ---
+    pad0: f32, pad1: f32, pad2: f32, pad3: f32, pad4: f32,
+
+    // --- スタイル配列（128バイト目からスタート） ---
+    styles: array<Style, 8>, // 128バイト (128〜255)
+};
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var zoom_texture_2d: texture_2d<f32>;
-@group(0) @binding(2) var linear_sampler: sampler; // ★JSの linearSampler と紐付く
 
 @group(1) @binding(0) var<storage, read> properties: array<Property>;
 // @group(1) @binding(1) var<storage, read> primitive_vertices: array<PrimitiveVertex>;
@@ -57,14 +75,14 @@ fn raw_to_ndc(packed_val: u32) -> vec2f {
   return vec2f(normalized_x, normalized_y) * 2.0 - 1.0;
 }
 
-fn sheer(color:vec3f, opacity: f32) -> vec4f {
-  // if(opacity<0){
-  //   let v_coord = (-opacity - 0.5) / 4.0;
-  //   let uv = vec2f(uniforms.u_scale, v_coord);
-  //   let sampled_data = textureSampleLevel(zoom_texture_2d, linear_sampler, uv, 0.0);
-  //   return vec4f(color, f32(sampled_data.g));
-  // }
-  return vec4f(color, 1.0);
+fn sheer(color:vec3f, o: f32) -> vec4f {
+  var opacity = o;
+  if　(opacity<0)　{
+    let style = uniforms.styles[u32(-opacity-1)];
+    let t = clamp((uniforms.u_zoom - style.min_zoom) / (style.max_zoom - style.min_zoom), 0.0, 1.0);
+    opacity = mix(style.min_val, style.max_val, t);
+  }
+  return vec4f(color, opacity);
 }
 
 @vertex
@@ -108,10 +126,9 @@ fn vs_polyline(
 
   var thickness = prop.thickness;
   if　(thickness<0)　{
-    let v_coord = (-thickness - 0.5) / 4.0;
-    let uv = vec2f(uniforms.u_scale, v_coord);
-    let sampled_data = textureSampleLevel(zoom_texture_2d, linear_sampler, uv, 0.0);
-    thickness = sampled_data.r;
+    let style = uniforms.styles[u32(-thickness-1)];
+    let t = clamp((uniforms.u_zoom - style.min_zoom) / (style.max_zoom - style.min_zoom), 0.0, 1.0);
+    thickness = mix(style.min_val, style.max_val, t);
   }
 
   let aspect = uniforms.u_res_x / uniforms.u_res_y;
@@ -130,6 +147,7 @@ fn vs_polyline(
   var z = f32(input.feature_id + 1u) * 1e-6;
   output.position = vec4f(final_pos, z, 1.0);
   output.color = sheer(prop.lineColor, prop.opacity);
+  // output.color = vec4f(prop.lineColor, 0.5);
   return output;
 }
 
