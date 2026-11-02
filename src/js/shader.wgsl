@@ -1,8 +1,4 @@
 struct PrimitiveVertex {
-  @location(0) packed_pos: u32,
-  @location(1) feature_id: u32,
-}
-struct PrimitiveVertex2 {
   @location(0) pos: vec2i,
   @location(1) feature_id: i32,
 }
@@ -60,26 +56,7 @@ struct VertexOutput {
   @location(2) pos: vec2f,
 }
 
-fn unpack_sint16x2(packed: u32) -> vec2f {
-  // 下位16ビットを抽出し、左シフト後に算術右シフトで符号拡張
-  let x = (i32(packed & 0xFFFFu) << 16) >> 16;
-  // 上位16ビットを抽出し、右シフト（算術）で符号拡張
-  let y = i32(packed) >> 16;
-
-  return vec2f(f32(x), f32(y));
-}
-
-fn raw_to_ndc(packed_val: u32) -> vec2f {
-  let decoded_pos = unpack_sint16x2(packed_val);
-
-  // MVTは左上が原点(0,0)、WebGPUは左下が(-1,-1)なので、Y軸を反転させる
-  let normalized_x = decoded_pos.x / 4096.0;
-  let normalized_y = 1.0 - (decoded_pos.y / 4096.0); // 1.0 - を入れる
-
-  return vec2f(normalized_x, normalized_y) * 2.0 - 1.0;
-}
-
-fn raw_to_ndc2(pos: vec2i) -> vec2f {
+fn raw_to_ndc(pos: vec2i) -> vec2f {
   let normalized_x = f32(pos.x) / 4096.0;
   let normalized_y = 1.0 - (f32(pos.y) / 4096.0); // 1.0 - を入れる
 
@@ -100,11 +77,11 @@ fn sheer(color:vec3f, o: f32) -> vec4f {
 fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
   var output: VertexOutput;
   let prop = properties[input.feature_id];
-  let ndc_pos = raw_to_ndc(input.packed_pos);
+  let ndc_pos = raw_to_ndc(input.pos);
 
   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
 
-  var z = f32(input.feature_id + 1u) * 1e-6;
+  var z = f32(input.feature_id + 1) * 1e-6;
   output.position = vec4f(cam_pos, z, 1.0);
   output.color = sheer(prop.fillColor, prop.opacity);
   return output;
@@ -114,19 +91,7 @@ fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
 fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
   var output: VertexOutput;
   let prop = properties[input.feature_id];
-  let ndc_pos = raw_to_ndc(input.packed_pos);
-  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
-  var z = f32(input.feature_id + 1u) * 1e-6 + 1e-7;
-  output.position = vec4f(cam_pos, z, 1.0);
-  output.color = sheer(prop.lineColor, prop.opacity);
-  return output;
-}
-
-@vertex
-fn vs_thinline2(input:PrimitiveVertex2) -> VertexOutput {
-  var output: VertexOutput;
-  let prop = properties[input.feature_id];
-  let ndc_pos = raw_to_ndc2(input.pos);
+  let ndc_pos = raw_to_ndc(input.pos);
   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
   var z = f32(input.feature_id + 1) * 1e-6 + 1e-7;
   output.position = vec4f(cam_pos, z, 1.0);
@@ -139,7 +104,7 @@ fn vs_polyline(
   input: PolylineVertex,
 ) -> VertexOutput {
   var output: VertexOutput;
-  let ndc_pos = raw_to_ndc2(input.pos);
+  let ndc_pos = raw_to_ndc(input.pos);
   let prop = properties[input.feature_id];
   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
 

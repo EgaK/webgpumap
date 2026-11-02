@@ -103,10 +103,10 @@ async function init(canvas, size, viewArray) {
     presentationFormat,
     shaderModule,
     "vs_polygon",
-    8,
+    16,
     [
-      [0, "uint32"],
-      [4, "uint32"],
+      [0, "sint32x2"],
+      [8, "sint32"],
     ],
     "triangle-list",
   );
@@ -118,21 +118,6 @@ async function init(canvas, size, viewArray) {
     presentationFormat,
     shaderModule,
     "vs_thinline",
-    8,
-    [
-      [0, "uint32"],
-      [4, "uint32"],
-    ],
-    "line-list",
-  );
-
-  const thinLinePipeline2 = makePipline(
-    device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_thinline2",
     16,
     [
       [0, "sint32x2"],
@@ -296,7 +281,7 @@ async function init(canvas, size, viewArray) {
       renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       // 細いポリライン
       renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-      renderPass.setPipeline(thinLinePipeline2);
+      renderPass.setPipeline(thinLinePipeline);
       renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }

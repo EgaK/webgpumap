@@ -142,7 +142,7 @@ export default async (zxy) => {
   function addThin(points, color, opacity) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      thinVertex.push(...p, propStructs.length, 1);
+      thinVertex.push(...p, propStructs.length, 1); //末尾の1はアライメントのパディング
       if (i < points.length - 1) {
         thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
       }
@@ -178,9 +178,7 @@ export default async (zxy) => {
         // earcut用
         earcutRawData.push(p[0], p[1]);
 
-        // GPUバッファ用（16ビットのバイナリを取り出してドッキング）
-        const packed = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-        polygonVertex.push(packed, propStructs.length);
+        polygonVertex.push(...p, propStructs.length, 1);
         currentVertexCount++;
 
         // 枠線（折れ線）用の処理
@@ -225,7 +223,6 @@ export default async (zxy) => {
       const base = lineVertex.length;
 
       const featureID = propStructs.length;
-      // let packed = ((current[1] & 0xffff) << 16) | (current[0] & 0xffff);
       const dx = next[0] - current[0];
       // GPU側の座標に合わせて符号を反転しておく
       const dy = -next[1] + current[1];
@@ -241,8 +238,6 @@ export default async (zxy) => {
         featureID,
         normal: [-dy, dx],
       });
-
-      // packed = ((next[1] & 0xffff) << 16) | (next[0] & 0xffff);
       lineVertex.push({
         pos: next,
         featureID,

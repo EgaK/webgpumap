@@ -26,10 +26,10 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   device.queue.writeBuffer(propertyBuffer, 0, propertyData);
 
   const polygonVertexBuffer = device.createBuffer({
-    size: tileData.polygonVertex.length * 8,
+    size: tileData.polygonVertex.length * 16,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
-  const polygonVertexData = new Uint32Array(tileData.polygonVertex);
+  const polygonVertexData = new Int32Array(tileData.polygonVertex);
   device.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
 
   const polygonIndexBuffer = device.createBuffer({
