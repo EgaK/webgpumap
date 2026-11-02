@@ -133,11 +133,12 @@ async function init(canvas, size, viewArray) {
     presentationFormat,
     shaderModule,
     "vs_polyline",
-    16,
+    32,
     [
-      [0, "uint32"],
-      [4, "uint32"],
-      [8, "float32x2"],
+      [0, "sint32x2"],
+      [8, "sint32"],
+      [12, "uint32"], // pad用 将来なにかに使ってね
+      [16, "float32x2"],
     ],
     "triangle-list",
     "fs_polyline",

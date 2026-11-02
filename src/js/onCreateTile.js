@@ -46,7 +46,7 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   const borderIndexData = new Uint32Array(tileData.borderIndex);
   device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
 
-  STRIDE = 16; // lineVertex は1要素16バイト
+  STRIDE = 32;
   const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device.createBuffer({
     size: lineVertexBufferSize,
@@ -55,12 +55,11 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   const lineVertexData = new Uint8Array(lineVertexBufferSize);
   tileData.lineVertex.forEach((vtx, i) => {
     const offset = i * STRIDE;
-    const buf1 = new Uint32Array([vtx.packed, vtx.featureID]);
-    // const buf2 = new Float32Array([...vtx.dir, vtx.is_right]);
+    const buf1 = new Int32Array([...vtx.pos, vtx.featureID]);
     const buf2 = new Float32Array(vtx.normal);
 
     lineVertexData.set(new Uint8Array(buf1.buffer), offset);
-    lineVertexData.set(new Uint8Array(buf2.buffer), offset + 8);
+    lineVertexData.set(new Uint8Array(buf2.buffer), offset + 16);
   });
   device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
 

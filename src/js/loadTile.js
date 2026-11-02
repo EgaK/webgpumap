@@ -226,31 +226,31 @@ export default async (zxy) => {
       const base = lineVertex.length;
 
       const featureID = propStructs.length;
-      let packed = ((current[1] & 0xffff) << 16) | (current[0] & 0xffff);
+      // let packed = ((current[1] & 0xffff) << 16) | (current[0] & 0xffff);
       const dx = next[0] - current[0];
       // GPU側の座標に合わせて符号を反転しておく
       const dy = -next[1] + current[1];
       // const len = Math.hypot(dx, dy) || 1.0;
 
       lineVertex.push({
-        packed,
+        pos: current,
         featureID,
         normal: [dy, -dx],
       });
       lineVertex.push({
-        packed,
+        pos: current,
         featureID,
         normal: [-dy, dx],
       });
 
-      packed = ((next[1] & 0xffff) << 16) | (next[0] & 0xffff);
+      // packed = ((next[1] & 0xffff) << 16) | (next[0] & 0xffff);
       lineVertex.push({
-        packed,
+        pos: next,
         featureID,
         normal: [-dy, dx],
       });
       lineVertex.push({
-        packed,
+        pos: next,
         featureID,
         normal: [dy, -dx],
       });

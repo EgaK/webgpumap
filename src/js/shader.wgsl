@@ -3,9 +3,10 @@ struct PrimitiveVertex {
   @location(1) feature_id: u32,
 }
 struct PolylineVertex {
-  @location(0) packed_pos: u32,
-  @location(1) feature_id: u32,
-  @location(2) normal: vec2f,
+  @location(0) pos: vec2i,
+  @location(1) feature_id: i32,
+  @location(2) pad: u32,
+  @location(3) normal: vec2f,
 }
 struct Property {
   fillColor: vec3f,
@@ -74,6 +75,13 @@ fn raw_to_ndc(packed_val: u32) -> vec2f {
   return vec2f(normalized_x, normalized_y) * 2.0 - 1.0;
 }
 
+fn raw_to_ndc2(pos: vec2i) -> vec2f {
+  let normalized_x = f32(pos.x) / 4096.0;
+  let normalized_y = 1.0 - (f32(pos.y) / 4096.0); // 1.0 - を入れる
+
+  return vec2f(normalized_x, normalized_y) * 2.0 - 1.0;
+}
+
 fn sheer(color:vec3f, o: f32) -> vec4f {
   var opacity = o;
   if　(opacity<0)　{
@@ -115,7 +123,7 @@ fn vs_polyline(
   input: PolylineVertex,
 ) -> VertexOutput {
   var output: VertexOutput;
-  let ndc_pos = raw_to_ndc(input.packed_pos);
+  let ndc_pos = raw_to_ndc2(input.pos);
   let prop = properties[input.feature_id];
   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
 
@@ -144,7 +152,7 @@ fn vs_polyline(
   // 6. 最終的な頂点座標（カメラ座標 ＋ 太らせたオフセット）
   let final_pos = cam_pos + offset;
 
-  var z = f32(input.feature_id + 1u) * 1e-6;
+  var z = f32(input.feature_id + 1) * 1e-6;
   output.position = vec4f(final_pos, z, 1.0);
   output.color = sheer(prop.lineColor, prop.opacity);
   output.normal = normal;
