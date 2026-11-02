@@ -233,7 +233,28 @@ async function init(canvas, size, viewArray) {
         },
       ],
     },
-    fragment: fragment,
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_polyline",
+      targets: [
+        {
+          format: presentationFormat,
+          // 以下の blend 設定を追加・変更する
+          blend: {
+            color: {
+              srcFactor: "src-alpha",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add",
+            },
+            alpha: {
+              srcFactor: "one",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add",
+            },
+          },
+        },
+      ],
+    },
     primitive: { topology: "triangle-list" },
     depthStencil: {
       format: "depth24plus",
