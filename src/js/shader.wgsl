@@ -2,6 +2,10 @@ struct PrimitiveVertex {
   @location(0) packed_pos: u32,
   @location(1) feature_id: u32,
 }
+struct PrimitiveVertex2 {
+  @location(0) pos: vec2i,
+  @location(1) feature_id: i32,
+}
 struct PolylineVertex {
   @location(0) pos: vec2i,
   @location(1) feature_id: i32,
@@ -113,6 +117,18 @@ fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
   let ndc_pos = raw_to_ndc(input.packed_pos);
   let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
   var z = f32(input.feature_id + 1u) * 1e-6 + 1e-7;
+  output.position = vec4f(cam_pos, z, 1.0);
+  output.color = sheer(prop.lineColor, prop.opacity);
+  return output;
+}
+
+@vertex
+fn vs_thinline2(input:PrimitiveVertex2) -> VertexOutput {
+  var output: VertexOutput;
+  let prop = properties[input.feature_id];
+  let ndc_pos = raw_to_ndc2(input.pos);
+  let cam_pos = (ndc_pos - uniforms.u_offset) * uniforms.u_scale;
+  var z = f32(input.feature_id + 1) * 1e-6 + 1e-7;
   output.position = vec4f(cam_pos, z, 1.0);
   output.color = sheer(prop.lineColor, prop.opacity);
   return output;

@@ -71,10 +71,10 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   device.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
 
   const thinVertexBuffer = device.createBuffer({
-    size: tileData.thinVertex.length * 8,
+    size: tileData.thinVertex.length * 16,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
-  const thinVertexData = new Uint32Array(tileData.thinVertex);
+  const thinVertexData = new Int32Array(tileData.thinVertex);
   device.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
 
   const thinIndexBuffer = device.createBuffer({

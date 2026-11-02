@@ -126,6 +126,21 @@ async function init(canvas, size, viewArray) {
     "line-list",
   );
 
+  const thinLinePipeline2 = makePipline(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_thinline2",
+    16,
+    [
+      [0, "sint32x2"],
+      [8, "sint32"],
+    ],
+    "line-list",
+  );
+
   const linePipeline = makePipline(
     device,
     commonBindGroupLayout,
@@ -281,7 +296,7 @@ async function init(canvas, size, viewArray) {
       renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       // 細いポリライン
       renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-      renderPass.setPipeline(thinLinePipeline);
+      renderPass.setPipeline(thinLinePipeline2);
       renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }

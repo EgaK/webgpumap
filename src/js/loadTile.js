@@ -142,8 +142,7 @@ export default async (zxy) => {
   function addThin(points, color, opacity) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      const packed = ((p[1] & 0xffff) << 16) | (p[0] & 0xffff);
-      thinVertex.push(packed, propStructs.length);
+      thinVertex.push(...p, propStructs.length, 1);
       if (i < points.length - 1) {
         thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
       }
