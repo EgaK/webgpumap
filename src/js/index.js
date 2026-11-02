@@ -17,11 +17,11 @@ canvas[0].height = 1200;
 canvas.css({ width: 400 + "px", height: 400 + "px" });
 const offcanvas = canvas[0].transferControlToOffscreen();
 
-// const blob = new Blob([WORKER_CODE], { type: "application/javascript" });
-// const workerUrl = URL.createObjectURL(blob);
-// const worker = new Worker(workerUrl);
+const blob = new Blob([WORKER_CODE], { type: "application/javascript" });
+const workerUrl = URL.createObjectURL(blob);
+const worker = new Worker(workerUrl);
 
-const worker = new Worker("/js/worker.js");
+// const worker = new Worker("/js/worker.js");
 worker.postMessage({ "c": offcanvas, "s": [800, 800], "b": sab }, [offcanvas]);
 
 // const canvas = document.getElementById("a");

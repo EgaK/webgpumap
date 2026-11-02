@@ -1,543 +1,5 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Style{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{u_mvp_matrix:mat4x4<f32>,u_offset:vec2<f32>,u_zoom:f32,u_scale:f32,u_res_x:f32,u_res_y:f32,u_tile_z:u32,u_tile_x:u32,u_tile_y:u32,u_tile_extent:f32,u_tile_opacity:f32,pad0:f32,pad1:f32,pad2:f32,pad3:f32,pad4:f32,styles:array<Style,8>,};@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.styles[u32(-opacity-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var thickness=prop.thickness;if(thickness==-1){output.pos=cam_pos;}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.styles[u32(-thickness-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.pos)>0&&length(input.normal)<0.5&&((input.pos.y+1)*20)% 2<0.5){discard;}return input.color;}`;
-
-// src/js/util/earcut.dev.js
-var steiners = /* @__PURE__ */ new Set();
-var filteredOut = false;
-function earcut(data, holeIndices, dim = 2) {
-  const hasHoles = holeIndices && holeIndices.length;
-  const outerLen = hasHoles ? holeIndices[0] * dim : data.length;
-  if (steiners.size) steiners.clear();
-  let outerNode = linkedList(data, 0, outerLen, dim, true);
-  const triangles = [];
-  if (!outerNode || outerNode.next === outerNode.prev) return triangles;
-  let minX = 0, minY = 0, invSize = 0;
-  if (hasHoles) outerNode = eliminateHoles(data, holeIndices, outerNode, dim);
-  if (data.length > 80 * dim) {
-    minX = data[0];
-    minY = data[1];
-    let maxX = minX;
-    let maxY = minY;
-    for (let i = dim; i < outerLen; i += dim) {
-      const x = data[i];
-      const y = data[i + 1];
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    }
-    invSize = Math.max(maxX - minX, maxY - minY);
-    invSize = invSize !== 0 ? 32767 / invSize : 0;
-  }
-  earcutLinked(outerNode, triangles, minX, minY, invSize);
-  return triangles;
-}
-function linkedList(data, start, end, dim, clockwise) {
-  let last = null;
-  if (clockwise === signedArea(data, start, end, dim) > 0) {
-    for (let i = start; i < end; i += dim)
-      last = insertNode(i / dim | 0, data[i], data[i + 1], last);
-  } else {
-    for (let i = end - dim; i >= start; i -= dim)
-      last = insertNode(i / dim | 0, data[i], data[i + 1], last);
-  }
-  if (last && equals(last, last.next)) {
-    removeNode(last);
-    last = last.next;
-  }
-  return last;
-}
-function filterPoints(start, end = start) {
-  const full = end === start;
-  let p = start, again;
-  do {
-    again = false;
-    if (p !== p.next && (steiners.size === 0 || !steiners.has(p)) && (equals(p, p.next) || area(p.prev, p, p.next) === 0)) {
-      if (full || p === end) end = p.prev;
-      filteredOut = true;
-      removeNode(p);
-      p = p.prev;
-      again = true;
-    } else if (full || p !== end) {
-      p = p.next;
-      again = !full;
-    }
-  } while (again || p !== end);
-  return end;
-}
-function earcutLinked(ear, triangles, minX, minY, invSize) {
-  if (invSize) indexCurve(ear, minX, minY, invSize);
-  let stop = ear, cured = false;
-  while (ear.prev !== ear.next) {
-    const prev = ear.prev;
-    const next = ear.next;
-    if (area(prev, ear, next) < 0 && (invSize ? isEarHashed(ear, minX, minY, invSize) : isEar(ear))) {
-      triangles.push(prev.i, ear.i, next.i);
-      removeNode(ear);
-      ear = next;
-      stop = next;
-      continue;
-    }
-    ear = next;
-    if (ear === stop) {
-      filteredOut = false;
-      ear = filterPoints(ear);
-      if (filteredOut) {
-        stop = ear;
-        continue;
-      }
-      if (!cured) {
-        ear = cureLocalIntersections(ear, triangles);
-        stop = ear;
-        cured = true;
-        continue;
-      }
-      splitEarcut(ear, triangles, minX, minY, invSize);
-      break;
-    }
-  }
-}
-function isEar(ear) {
-  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy);
-  let p = c.next;
-  while (p !== a) {
-    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
-      return false;
-    p = p.next;
-  }
-  return true;
-}
-function isEarHashed(ear, minX, minY, invSize) {
-  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy), minZ = zOrder(x0, y0, minX, minY, invSize), maxZ = zOrder(x1, y1, minX, minY, invSize);
-  let p = ear.prevZ;
-  while (p && p.z >= minZ) {
-    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p !== c && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
-      return false;
-    p = p.prevZ;
-  }
-  let n = ear.nextZ;
-  while (n && n.z <= maxZ) {
-    if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1 && n !== c && !(ax === n.x && ay === n.y) && pointInTriangle(ax, ay, bx, by, cx, cy, n.x, n.y) && area(n.prev, n, n.next) >= 0)
-      return false;
-    n = n.nextZ;
-  }
-  return true;
-}
-function cureLocalIntersections(start, triangles) {
-  let p = start;
-  let cured = false;
-  do {
-    const a = p.prev, b = p.next.next;
-    if (intersects(a, p, p.next, b, false) && locallyInside(a, b) && locallyInside(b, a)) {
-      triangles.push(a.i, p.i, b.i);
-      removeNode(p);
-      removeNode(p.next);
-      p = start = b;
-      cured = true;
-    }
-    p = p.next;
-  } while (p !== start);
-  return cured ? filterPoints(p) : p;
-}
-function splitEarcut(start, triangles, minX, minY, invSize) {
-  let a = start;
-  do {
-    let b = a.next.next;
-    while (b !== a.prev) {
-      if (a.i !== b.i && isValidDiagonal(a, b)) {
-        let c = splitPolygon(a, b);
-        a = filterPoints(a, a.next);
-        c = filterPoints(c, c.next);
-        earcutLinked(a, triangles, minX, minY, invSize);
-        earcutLinked(c, triangles, minX, minY, invSize);
-        return;
-      }
-      b = b.next;
-    }
-    a = a.next;
-  } while (a !== start);
-}
-var indexActive = false;
-function eliminateHoles(data, holeIndices, outerNode, dim) {
-  const queue = [];
-  for (let i = 0, len = holeIndices.length; i < len; i++) {
-    const start = holeIndices[i] * dim;
-    const end = i < len - 1 ? holeIndices[i + 1] * dim : data.length;
-    const list = (
-      /** @type {Node} */
-      linkedList(data, start, end, dim, false)
-    );
-    if (list === list.next) steiners.add(list);
-    queue.push(getLeftmost(list));
-  }
-  queue.sort(compareXYSlope);
-  buildBlockIndex(data.length / dim, holeIndices.length);
-  indexSegment(outerNode, outerNode);
-  indexActive = true;
-  for (let i = 0; i < queue.length; i++) {
-    outerNode = eliminateHole(queue[i], outerNode);
-  }
-  indexActive = false;
-  return filterPoints(outerNode);
-}
-function compareXYSlope(a, b) {
-  return a.x - b.x || a.y - b.y || (a.next.y - a.y) / (a.next.x - a.x) - (b.next.y - b.y) / (b.next.x - b.x);
-}
-function eliminateHole(hole, outerNode) {
-  const bridge = findHoleBridge(hole, outerNode);
-  if (!bridge) {
-    return outerNode;
-  }
-  const bridgeReverse = splitPolygon(bridge, hole);
-  const bridge2 = bridgeReverse.next;
-  indexSegment(bridge, bridge2.next);
-  filterPoints(bridgeReverse, bridgeReverse.next);
-  return filterPoints(bridge, bridge.next);
-}
-var K = 16;
-var blockBBox = new Float64Array(0);
-var numBlocks = 0;
-var blockHead = [];
-var blockStop = [];
-function buildBlockIndex(maxNodes, numHoles) {
-  const maxBlocks = Math.ceil((maxNodes + 2 * numHoles) / K) + numHoles + 2;
-  if (blockBBox.length < maxBlocks * 4)
-    blockBBox = new Float64Array(maxBlocks * 4);
-  numBlocks = 0;
-}
-function indexSegment(head, stop) {
-  let p = head;
-  do {
-    const b = numBlocks++;
-    blockHead[b] = p;
-    let minX = p.x, minY = p.y, maxX = p.x, maxY = p.y;
-    let k = 0;
-    do {
-      const c = p.next;
-      p.z = b;
-      if (c.x < minX) minX = c.x;
-      if (c.x > maxX) maxX = c.x;
-      if (c.y < minY) minY = c.y;
-      if (c.y > maxY) maxY = c.y;
-      p = c;
-    } while (++k < K && p !== stop);
-    blockStop[b] = p;
-    const g = b * 4;
-    blockBBox[g] = minX;
-    blockBBox[g + 1] = minY;
-    blockBBox[g + 2] = maxX;
-    blockBBox[g + 3] = maxY;
-  } while (p !== stop);
-}
-function growBlock(head, tail) {
-  const g = head.z * 4;
-  if (tail.x < blockBBox[g]) blockBBox[g] = tail.x;
-  if (tail.y < blockBBox[g + 1]) blockBBox[g + 1] = tail.y;
-  if (tail.x > blockBBox[g + 2]) blockBBox[g + 2] = tail.x;
-  if (tail.y > blockBBox[g + 3]) blockBBox[g + 3] = tail.y;
-}
-function liveBlockStop(b) {
-  let stop = blockStop[b];
-  while (stop.prev.next !== stop) stop = stop.next;
-  blockStop[b] = stop;
-  return stop;
-}
-function liveBlockHead(b) {
-  let head = blockHead[b];
-  while (head.prev.next !== head) head = head.next;
-  blockHead[b] = head;
-  return head;
-}
-function findHoleBridge(hole, outerNode) {
-  let p = outerNode;
-  const hx = hole.x;
-  const hy = hole.y;
-  let qx = -Infinity;
-  let m;
-  if (equals(hole, p)) return p;
-  for (let b = 0, g = 0; b < numBlocks; b++, g += 4) {
-    if (hy < blockBBox[g + 1] || hy > blockBBox[g + 3] || blockBBox[g] > hx || blockBBox[g + 2] <= qx)
-      continue;
-    const stop = liveBlockStop(b);
-    p = liveBlockHead(b);
-    do {
-      if (p.prev.next === p) {
-        if (equals(hole, p.next)) return p.next;
-        else if (hy <= p.y && hy >= p.next.y && p.next.y !== p.y) {
-          const x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y);
-          if (x <= hx && x > qx) {
-            qx = x;
-            m = p.x < p.next.x ? p : p.next;
-            if (x === hx) return m;
-          }
-        }
-      }
-      p = p.next;
-    } while (p !== stop);
-  }
-  if (!m) return null;
-  const mx = m.x;
-  const my = m.y;
-  const tminY = Math.min(hy, my);
-  const tmaxY = Math.max(hy, my);
-  let tanMin = Infinity;
-  for (let b = 0, g = 0; b < numBlocks; b++, g += 4) {
-    if (blockBBox[g + 2] < mx || blockBBox[g] > hx || blockBBox[g + 3] < tminY || blockBBox[g + 1] > tmaxY)
-      continue;
-    const stop = liveBlockStop(b);
-    p = liveBlockHead(b);
-    do {
-      if (p.prev.next === p && hx >= p.x && p.x >= mx && hx !== p.x && // skip dead nodes
-      pointInTriangle(
-        hy < my ? hx : qx,
-        hy,
-        mx,
-        my,
-        hy < my ? qx : hx,
-        hy,
-        p.x,
-        p.y
-      )) {
-        const tan = Math.abs(hy - p.y) / (hx - p.x);
-        if ((locallyInside(p, hole) || p.y === hy && p.next.y === hy && p.next.x > hx) && (tan < tanMin || tan === tanMin && (p.x > m.x || p.x === m.x && sectorContainsSector(m, p)))) {
-          m = p;
-          tanMin = tan;
-        }
-      }
-      p = p.next;
-    } while (p !== stop);
-  }
-  return m;
-}
-function sectorContainsSector(m, p) {
-  return area(m.prev, m, p.prev) < 0 && area(p.next, m, m.next) < 0;
-}
-var sortArr = [];
-var sortBuf = [];
-var zArr = new Uint32Array(0);
-var zBuf = new Uint32Array(0);
-var counts = new Uint32Array(256);
-function indexCurve(start, minX, minY, invSize) {
-  let p = start;
-  let n = 0;
-  do {
-    p.z = zOrder(p.x, p.y, minX, minY, invSize);
-    sortArr[n++] = p;
-    p = p.next;
-  } while (p !== start);
-  sortNodes(n);
-  let prev = null;
-  for (let i = 0; i < n; i++) {
-    const node = sortArr[i];
-    node.prevZ = prev;
-    if (prev) prev.nextZ = node;
-    prev = node;
-  }
-  prev.nextZ = null;
-  sortArr.fill(
-    /** @type {Node} */
-    /** @type {unknown} */
-    null,
-    0,
-    n
-  );
-  sortBuf.fill(
-    /** @type {Node} */
-    /** @type {unknown} */
-    null,
-    0,
-    n
-  );
-}
-function sortNodes(n) {
-  if (n <= 32) {
-    for (let i = 1; i < n; i++) {
-      const node = sortArr[i], z = node.z;
-      let j = i - 1;
-      while (j >= 0 && sortArr[j].z > z) {
-        sortArr[j + 1] = sortArr[j];
-        j--;
-      }
-      sortArr[j + 1] = node;
-    }
-    return;
-  }
-  if (zArr.length < n) {
-    zArr = new Uint32Array(n);
-    zBuf = new Uint32Array(n);
-    sortBuf = new Array(n);
-  }
-  for (let i = 0; i < n; i++) zArr[i] = sortArr[i].z;
-  radixPass(n, sortArr, zArr, sortBuf, zBuf, 0);
-  radixPass(n, sortBuf, zBuf, sortArr, zArr, 8);
-  radixPass(n, sortArr, zArr, sortBuf, zBuf, 16);
-  radixPass(n, sortBuf, zBuf, sortArr, zArr, 24);
-}
-function radixPass(n, src, srcZ, dst, dstZ, shift) {
-  counts.fill(0);
-  for (let i = 0; i < n; i++) counts[srcZ[i] >>> shift & 255]++;
-  let sum = 0;
-  for (let b = 0; b < 256; b++) {
-    const c = counts[b];
-    counts[b] = sum;
-    sum += c;
-  }
-  for (let i = 0; i < n; i++) {
-    const z = srcZ[i];
-    const pos = counts[z >>> shift & 255]++;
-    dst[pos] = src[i];
-    dstZ[pos] = z;
-  }
-}
-function zOrder(x, y, minX, minY, invSize) {
-  x = (x - minX) * invSize | 0;
-  y = (y - minY) * invSize | 0;
-  x = (x | x << 8) & 16711935;
-  x = (x | x << 4) & 252645135;
-  x = (x | x << 2) & 858993459;
-  x = (x | x << 1) & 1431655765;
-  y = (y | y << 8) & 16711935;
-  y = (y | y << 4) & 252645135;
-  y = (y | y << 2) & 858993459;
-  y = (y | y << 1) & 1431655765;
-  return x | y << 1;
-}
-function getLeftmost(start) {
-  let p = start, leftmost = start;
-  do {
-    if (p.x < leftmost.x || p.x === leftmost.x && p.y < leftmost.y)
-      leftmost = p;
-    p = p.next;
-  } while (p !== start);
-  return leftmost;
-}
-function pointInTriangle(ax, ay, bx, by, cx, cy, px, py) {
-  return (cx - px) * (ay - py) >= (ax - px) * (cy - py) && (ax - px) * (by - py) >= (bx - px) * (ay - py) && (bx - px) * (cy - py) >= (cx - px) * (by - py);
-}
-function isValidDiagonal(a, b) {
-  const zeroLength = equals(a, b) && area(a.prev, a, a.next) > 0 && area(b.prev, b, b.next) > 0;
-  return a.next.i !== b.i && (zeroLength || locallyInside(a, b) && locallyInside(b, a) && // // locally visible
-  (area(a.prev, a, b.prev) !== 0 || area(a, b.prev, b) !== 0)) && // no opposite-facing sectors
-  !intersectsPolygon(a, b) && (zeroLength || middleInside(a, b));
-}
-function area(p, q, r) {
-  return (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
-}
-function equals(p1, p2) {
-  return p1.x === p2.x && p1.y === p2.y;
-}
-function intersects(p1, q1, p2, q2, includeBoundary = true) {
-  const o1 = area(p1, q1, p2);
-  const o2 = area(p1, q1, q2);
-  const o3 = area(p2, q2, p1);
-  const o4 = area(p2, q2, q1);
-  if ((o1 > 0 && o2 < 0 || o1 < 0 && o2 > 0) && (o3 > 0 && o4 < 0 || o3 < 0 && o4 > 0))
-    return true;
-  if (!includeBoundary) return false;
-  if (o1 === 0 && onSegment(p1, p2, q1)) return true;
-  if (o2 === 0 && onSegment(p1, q2, q1)) return true;
-  if (o3 === 0 && onSegment(p2, p1, q2)) return true;
-  if (o4 === 0 && onSegment(p2, q1, q2)) return true;
-  return false;
-}
-function onSegment(p, q, r) {
-  return q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y);
-}
-function intersectsPolygon(a, b) {
-  const minX = Math.min(a.x, b.x);
-  const maxX = Math.max(a.x, b.x);
-  const minY = Math.min(a.y, b.y);
-  const maxY = Math.max(a.y, b.y);
-  let p = a;
-  do {
-    const n = p.next;
-    if (p.x > maxX && n.x > maxX || p.x < minX && n.x < minX || p.y > maxY && n.y > maxY || p.y < minY && n.y < minY) {
-      p = n;
-      continue;
-    }
-    if (p.i !== a.i && n.i !== a.i && p.i !== b.i && n.i !== b.i && intersects(p, n, a, b))
-      return true;
-    p = n;
-  } while (p !== a);
-  return false;
-}
-function locallyInside(a, b) {
-  return area(a.prev, a, a.next) < 0 ? area(a, b, a.next) >= 0 && area(a, a.prev, b) >= 0 : area(a, b, a.prev) < 0 || area(a, a.next, b) < 0;
-}
-function middleInside(a, b) {
-  let p = a;
-  let inside = false;
-  const px = (a.x + b.x) / 2;
-  const py = (a.y + b.y) / 2;
-  do {
-    const n = p.next;
-    if (p.y > py !== n.y > py && px < (n.x - p.x) * (py - p.y) / (n.y - p.y) + p.x)
-      inside = !inside;
-    p = n;
-  } while (p !== a);
-  return inside;
-}
-function splitPolygon(a, b) {
-  const a2 = createNode(a.i, a.x, a.y), b2 = createNode(b.i, b.x, b.y), an = a.next, bp = b.prev;
-  a.next = b;
-  b.prev = a;
-  a2.next = an;
-  an.prev = a2;
-  b2.next = a2;
-  a2.prev = b2;
-  bp.next = b2;
-  b2.prev = bp;
-  return b2;
-}
-function insertNode(i, x, y, last) {
-  const p = createNode(i, x, y);
-  if (!last) {
-    p.prev = p;
-    p.next = p;
-  } else {
-    p.next = last.next;
-    p.prev = last;
-    last.next.prev = p;
-    last.next = p;
-  }
-  return p;
-}
-function removeNode(p) {
-  p.next.prev = p.prev;
-  p.prev.next = p.next;
-  if (p.prevZ) p.prevZ.nextZ = p.nextZ;
-  if (p.nextZ) p.nextZ.prevZ = p.prevZ;
-  if (indexActive) growBlock(p.prev, p.next);
-}
-function createNode(i, x, y) {
-  return (
-    /** @type {Node} */
-    /** @type {unknown} */
-    {
-      i,
-      // vertex index in coordinates array
-      x,
-      y,
-      // vertex coordinates
-      prev: null,
-      // previous and next vertex nodes in a polygon ring
-      next: null,
-      z: 0,
-      // z-order curve value; doubles as owning block in the hole-bridge index during eliminateHoles
-      prevZ: null,
-      // previous and next nodes in z-order
-      nextZ: null
-    }
-  );
-}
-function signedArea(data, start, end, dim) {
-  let sum = 0;
-  for (let i = start, j = end - dim; i < end; i += dim) {
-    sum += (data[j] - data[i]) * (data[i + 1] + data[j + 1]);
-    j = i;
-  }
-  return sum;
-}
+var shader_default = `struct PrimitiveVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,}struct PolylineVertex{@location(0)packed_pos:u32,@location(1)feature_id:u32,@location(2)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Style{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{u_mvp_matrix:mat4x4<f32>,u_offset:vec2<f32>,u_zoom:f32,u_scale:f32,u_res_x:f32,u_res_y:f32,u_tile_z:u32,u_tile_x:u32,u_tile_y:u32,u_tile_extent:f32,u_tile_opacity:f32,pad0:f32,pad1:f32,pad2:f32,pad3:f32,pad4:f32,styles:array<Style,8>,};@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn unpack_sint16x2(packed:u32)->vec2f{let x=(i32(packed&0xFFFFu)<<16)>>16;let y=i32(packed)>>16;return vec2f(f32(x),f32(y));}fn raw_to_ndc(packed_val:u32)->vec2f{let decoded_pos=unpack_sint16x2(packed_val);let normalized_x=decoded_pos.x/4096.0;let normalized_y=1.0-(decoded_pos.y/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.styles[u32(-opacity-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.packed_pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1u)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.packed_pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var thickness=prop.thickness;if(thickness==-1){output.pos=cam_pos;}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.styles[u32(-thickness-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1u)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.pos)>0&&length(input.normal)<0.5&&((input.pos.y+1)*20)% 2>0.5){discard;}return input.color;}`;
 
 // src/js/onCreateTile.js
 function onCreateTile(device, tileBindGroupLayout, tileData) {
@@ -1090,7 +552,7 @@ function classifyRings(rings) {
   const polygons = [];
   let polygon, ccw;
   for (let i = 0; i < len; i++) {
-    const area2 = signedArea2(rings[i]);
+    const area2 = signedArea(rings[i]);
     if (area2 === 0) continue;
     if (ccw === void 0) ccw = area2 < 0;
     if (ccw === area2 < 0) {
@@ -1103,7 +565,7 @@ function classifyRings(rings) {
   if (polygon) polygons.push(polygon);
   return polygons;
 }
-function signedArea2(ring) {
+function signedArea(ring) {
   let sum = 0;
   for (let i = 0, len = ring.length, j = len - 1, p1, p2; i < len; j = i++) {
     p1 = ring[i];
@@ -1488,6 +950,544 @@ var readUtf8 = (buf, pos, end) => {
   }
   return str;
 };
+
+// src/js/util/earcut.dev.js
+var steiners = /* @__PURE__ */ new Set();
+var filteredOut = false;
+function earcut(data, holeIndices, dim = 2) {
+  const hasHoles = holeIndices && holeIndices.length;
+  const outerLen = hasHoles ? holeIndices[0] * dim : data.length;
+  if (steiners.size) steiners.clear();
+  let outerNode = linkedList(data, 0, outerLen, dim, true);
+  const triangles = [];
+  if (!outerNode || outerNode.next === outerNode.prev) return triangles;
+  let minX = 0, minY = 0, invSize = 0;
+  if (hasHoles) outerNode = eliminateHoles(data, holeIndices, outerNode, dim);
+  if (data.length > 80 * dim) {
+    minX = data[0];
+    minY = data[1];
+    let maxX = minX;
+    let maxY = minY;
+    for (let i = dim; i < outerLen; i += dim) {
+      const x = data[i];
+      const y = data[i + 1];
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    invSize = Math.max(maxX - minX, maxY - minY);
+    invSize = invSize !== 0 ? 32767 / invSize : 0;
+  }
+  earcutLinked(outerNode, triangles, minX, minY, invSize);
+  return triangles;
+}
+function linkedList(data, start, end, dim, clockwise) {
+  let last = null;
+  if (clockwise === signedArea2(data, start, end, dim) > 0) {
+    for (let i = start; i < end; i += dim)
+      last = insertNode(i / dim | 0, data[i], data[i + 1], last);
+  } else {
+    for (let i = end - dim; i >= start; i -= dim)
+      last = insertNode(i / dim | 0, data[i], data[i + 1], last);
+  }
+  if (last && equals(last, last.next)) {
+    removeNode(last);
+    last = last.next;
+  }
+  return last;
+}
+function filterPoints(start, end = start) {
+  const full = end === start;
+  let p = start, again;
+  do {
+    again = false;
+    if (p !== p.next && (steiners.size === 0 || !steiners.has(p)) && (equals(p, p.next) || area(p.prev, p, p.next) === 0)) {
+      if (full || p === end) end = p.prev;
+      filteredOut = true;
+      removeNode(p);
+      p = p.prev;
+      again = true;
+    } else if (full || p !== end) {
+      p = p.next;
+      again = !full;
+    }
+  } while (again || p !== end);
+  return end;
+}
+function earcutLinked(ear, triangles, minX, minY, invSize) {
+  if (invSize) indexCurve(ear, minX, minY, invSize);
+  let stop = ear, cured = false;
+  while (ear.prev !== ear.next) {
+    const prev = ear.prev;
+    const next = ear.next;
+    if (area(prev, ear, next) < 0 && (invSize ? isEarHashed(ear, minX, minY, invSize) : isEar(ear))) {
+      triangles.push(prev.i, ear.i, next.i);
+      removeNode(ear);
+      ear = next;
+      stop = next;
+      continue;
+    }
+    ear = next;
+    if (ear === stop) {
+      filteredOut = false;
+      ear = filterPoints(ear);
+      if (filteredOut) {
+        stop = ear;
+        continue;
+      }
+      if (!cured) {
+        ear = cureLocalIntersections(ear, triangles);
+        stop = ear;
+        cured = true;
+        continue;
+      }
+      splitEarcut(ear, triangles, minX, minY, invSize);
+      break;
+    }
+  }
+}
+function isEar(ear) {
+  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy);
+  let p = c.next;
+  while (p !== a) {
+    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
+      return false;
+    p = p.next;
+  }
+  return true;
+}
+function isEarHashed(ear, minX, minY, invSize) {
+  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy), minZ = zOrder(x0, y0, minX, minY, invSize), maxZ = zOrder(x1, y1, minX, minY, invSize);
+  let p = ear.prevZ;
+  while (p && p.z >= minZ) {
+    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p !== c && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
+      return false;
+    p = p.prevZ;
+  }
+  let n = ear.nextZ;
+  while (n && n.z <= maxZ) {
+    if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1 && n !== c && !(ax === n.x && ay === n.y) && pointInTriangle(ax, ay, bx, by, cx, cy, n.x, n.y) && area(n.prev, n, n.next) >= 0)
+      return false;
+    n = n.nextZ;
+  }
+  return true;
+}
+function cureLocalIntersections(start, triangles) {
+  let p = start;
+  let cured = false;
+  do {
+    const a = p.prev, b = p.next.next;
+    if (intersects(a, p, p.next, b, false) && locallyInside(a, b) && locallyInside(b, a)) {
+      triangles.push(a.i, p.i, b.i);
+      removeNode(p);
+      removeNode(p.next);
+      p = start = b;
+      cured = true;
+    }
+    p = p.next;
+  } while (p !== start);
+  return cured ? filterPoints(p) : p;
+}
+function splitEarcut(start, triangles, minX, minY, invSize) {
+  let a = start;
+  do {
+    let b = a.next.next;
+    while (b !== a.prev) {
+      if (a.i !== b.i && isValidDiagonal(a, b)) {
+        let c = splitPolygon(a, b);
+        a = filterPoints(a, a.next);
+        c = filterPoints(c, c.next);
+        earcutLinked(a, triangles, minX, minY, invSize);
+        earcutLinked(c, triangles, minX, minY, invSize);
+        return;
+      }
+      b = b.next;
+    }
+    a = a.next;
+  } while (a !== start);
+}
+var indexActive = false;
+function eliminateHoles(data, holeIndices, outerNode, dim) {
+  const queue = [];
+  for (let i = 0, len = holeIndices.length; i < len; i++) {
+    const start = holeIndices[i] * dim;
+    const end = i < len - 1 ? holeIndices[i + 1] * dim : data.length;
+    const list = (
+      /** @type {Node} */
+      linkedList(data, start, end, dim, false)
+    );
+    if (list === list.next) steiners.add(list);
+    queue.push(getLeftmost(list));
+  }
+  queue.sort(compareXYSlope);
+  buildBlockIndex(data.length / dim, holeIndices.length);
+  indexSegment(outerNode, outerNode);
+  indexActive = true;
+  for (let i = 0; i < queue.length; i++) {
+    outerNode = eliminateHole(queue[i], outerNode);
+  }
+  indexActive = false;
+  return filterPoints(outerNode);
+}
+function compareXYSlope(a, b) {
+  return a.x - b.x || a.y - b.y || (a.next.y - a.y) / (a.next.x - a.x) - (b.next.y - b.y) / (b.next.x - b.x);
+}
+function eliminateHole(hole, outerNode) {
+  const bridge = findHoleBridge(hole, outerNode);
+  if (!bridge) {
+    return outerNode;
+  }
+  const bridgeReverse = splitPolygon(bridge, hole);
+  const bridge2 = bridgeReverse.next;
+  indexSegment(bridge, bridge2.next);
+  filterPoints(bridgeReverse, bridgeReverse.next);
+  return filterPoints(bridge, bridge.next);
+}
+var K = 16;
+var blockBBox = new Float64Array(0);
+var numBlocks = 0;
+var blockHead = [];
+var blockStop = [];
+function buildBlockIndex(maxNodes, numHoles) {
+  const maxBlocks = Math.ceil((maxNodes + 2 * numHoles) / K) + numHoles + 2;
+  if (blockBBox.length < maxBlocks * 4)
+    blockBBox = new Float64Array(maxBlocks * 4);
+  numBlocks = 0;
+}
+function indexSegment(head, stop) {
+  let p = head;
+  do {
+    const b = numBlocks++;
+    blockHead[b] = p;
+    let minX = p.x, minY = p.y, maxX = p.x, maxY = p.y;
+    let k = 0;
+    do {
+      const c = p.next;
+      p.z = b;
+      if (c.x < minX) minX = c.x;
+      if (c.x > maxX) maxX = c.x;
+      if (c.y < minY) minY = c.y;
+      if (c.y > maxY) maxY = c.y;
+      p = c;
+    } while (++k < K && p !== stop);
+    blockStop[b] = p;
+    const g = b * 4;
+    blockBBox[g] = minX;
+    blockBBox[g + 1] = minY;
+    blockBBox[g + 2] = maxX;
+    blockBBox[g + 3] = maxY;
+  } while (p !== stop);
+}
+function growBlock(head, tail) {
+  const g = head.z * 4;
+  if (tail.x < blockBBox[g]) blockBBox[g] = tail.x;
+  if (tail.y < blockBBox[g + 1]) blockBBox[g + 1] = tail.y;
+  if (tail.x > blockBBox[g + 2]) blockBBox[g + 2] = tail.x;
+  if (tail.y > blockBBox[g + 3]) blockBBox[g + 3] = tail.y;
+}
+function liveBlockStop(b) {
+  let stop = blockStop[b];
+  while (stop.prev.next !== stop) stop = stop.next;
+  blockStop[b] = stop;
+  return stop;
+}
+function liveBlockHead(b) {
+  let head = blockHead[b];
+  while (head.prev.next !== head) head = head.next;
+  blockHead[b] = head;
+  return head;
+}
+function findHoleBridge(hole, outerNode) {
+  let p = outerNode;
+  const hx = hole.x;
+  const hy = hole.y;
+  let qx = -Infinity;
+  let m;
+  if (equals(hole, p)) return p;
+  for (let b = 0, g = 0; b < numBlocks; b++, g += 4) {
+    if (hy < blockBBox[g + 1] || hy > blockBBox[g + 3] || blockBBox[g] > hx || blockBBox[g + 2] <= qx)
+      continue;
+    const stop = liveBlockStop(b);
+    p = liveBlockHead(b);
+    do {
+      if (p.prev.next === p) {
+        if (equals(hole, p.next)) return p.next;
+        else if (hy <= p.y && hy >= p.next.y && p.next.y !== p.y) {
+          const x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y);
+          if (x <= hx && x > qx) {
+            qx = x;
+            m = p.x < p.next.x ? p : p.next;
+            if (x === hx) return m;
+          }
+        }
+      }
+      p = p.next;
+    } while (p !== stop);
+  }
+  if (!m) return null;
+  const mx = m.x;
+  const my = m.y;
+  const tminY = Math.min(hy, my);
+  const tmaxY = Math.max(hy, my);
+  let tanMin = Infinity;
+  for (let b = 0, g = 0; b < numBlocks; b++, g += 4) {
+    if (blockBBox[g + 2] < mx || blockBBox[g] > hx || blockBBox[g + 3] < tminY || blockBBox[g + 1] > tmaxY)
+      continue;
+    const stop = liveBlockStop(b);
+    p = liveBlockHead(b);
+    do {
+      if (p.prev.next === p && hx >= p.x && p.x >= mx && hx !== p.x && // skip dead nodes
+      pointInTriangle(
+        hy < my ? hx : qx,
+        hy,
+        mx,
+        my,
+        hy < my ? qx : hx,
+        hy,
+        p.x,
+        p.y
+      )) {
+        const tan = Math.abs(hy - p.y) / (hx - p.x);
+        if ((locallyInside(p, hole) || p.y === hy && p.next.y === hy && p.next.x > hx) && (tan < tanMin || tan === tanMin && (p.x > m.x || p.x === m.x && sectorContainsSector(m, p)))) {
+          m = p;
+          tanMin = tan;
+        }
+      }
+      p = p.next;
+    } while (p !== stop);
+  }
+  return m;
+}
+function sectorContainsSector(m, p) {
+  return area(m.prev, m, p.prev) < 0 && area(p.next, m, m.next) < 0;
+}
+var sortArr = [];
+var sortBuf = [];
+var zArr = new Uint32Array(0);
+var zBuf = new Uint32Array(0);
+var counts = new Uint32Array(256);
+function indexCurve(start, minX, minY, invSize) {
+  let p = start;
+  let n = 0;
+  do {
+    p.z = zOrder(p.x, p.y, minX, minY, invSize);
+    sortArr[n++] = p;
+    p = p.next;
+  } while (p !== start);
+  sortNodes(n);
+  let prev = null;
+  for (let i = 0; i < n; i++) {
+    const node = sortArr[i];
+    node.prevZ = prev;
+    if (prev) prev.nextZ = node;
+    prev = node;
+  }
+  prev.nextZ = null;
+  sortArr.fill(
+    /** @type {Node} */
+    /** @type {unknown} */
+    null,
+    0,
+    n
+  );
+  sortBuf.fill(
+    /** @type {Node} */
+    /** @type {unknown} */
+    null,
+    0,
+    n
+  );
+}
+function sortNodes(n) {
+  if (n <= 32) {
+    for (let i = 1; i < n; i++) {
+      const node = sortArr[i], z = node.z;
+      let j = i - 1;
+      while (j >= 0 && sortArr[j].z > z) {
+        sortArr[j + 1] = sortArr[j];
+        j--;
+      }
+      sortArr[j + 1] = node;
+    }
+    return;
+  }
+  if (zArr.length < n) {
+    zArr = new Uint32Array(n);
+    zBuf = new Uint32Array(n);
+    sortBuf = new Array(n);
+  }
+  for (let i = 0; i < n; i++) zArr[i] = sortArr[i].z;
+  radixPass(n, sortArr, zArr, sortBuf, zBuf, 0);
+  radixPass(n, sortBuf, zBuf, sortArr, zArr, 8);
+  radixPass(n, sortArr, zArr, sortBuf, zBuf, 16);
+  radixPass(n, sortBuf, zBuf, sortArr, zArr, 24);
+}
+function radixPass(n, src, srcZ, dst, dstZ, shift) {
+  counts.fill(0);
+  for (let i = 0; i < n; i++) counts[srcZ[i] >>> shift & 255]++;
+  let sum = 0;
+  for (let b = 0; b < 256; b++) {
+    const c = counts[b];
+    counts[b] = sum;
+    sum += c;
+  }
+  for (let i = 0; i < n; i++) {
+    const z = srcZ[i];
+    const pos = counts[z >>> shift & 255]++;
+    dst[pos] = src[i];
+    dstZ[pos] = z;
+  }
+}
+function zOrder(x, y, minX, minY, invSize) {
+  x = (x - minX) * invSize | 0;
+  y = (y - minY) * invSize | 0;
+  x = (x | x << 8) & 16711935;
+  x = (x | x << 4) & 252645135;
+  x = (x | x << 2) & 858993459;
+  x = (x | x << 1) & 1431655765;
+  y = (y | y << 8) & 16711935;
+  y = (y | y << 4) & 252645135;
+  y = (y | y << 2) & 858993459;
+  y = (y | y << 1) & 1431655765;
+  return x | y << 1;
+}
+function getLeftmost(start) {
+  let p = start, leftmost = start;
+  do {
+    if (p.x < leftmost.x || p.x === leftmost.x && p.y < leftmost.y)
+      leftmost = p;
+    p = p.next;
+  } while (p !== start);
+  return leftmost;
+}
+function pointInTriangle(ax, ay, bx, by, cx, cy, px, py) {
+  return (cx - px) * (ay - py) >= (ax - px) * (cy - py) && (ax - px) * (by - py) >= (bx - px) * (ay - py) && (bx - px) * (cy - py) >= (cx - px) * (by - py);
+}
+function isValidDiagonal(a, b) {
+  const zeroLength = equals(a, b) && area(a.prev, a, a.next) > 0 && area(b.prev, b, b.next) > 0;
+  return a.next.i !== b.i && (zeroLength || locallyInside(a, b) && locallyInside(b, a) && // // locally visible
+  (area(a.prev, a, b.prev) !== 0 || area(a, b.prev, b) !== 0)) && // no opposite-facing sectors
+  !intersectsPolygon(a, b) && (zeroLength || middleInside(a, b));
+}
+function area(p, q, r) {
+  return (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+}
+function equals(p1, p2) {
+  return p1.x === p2.x && p1.y === p2.y;
+}
+function intersects(p1, q1, p2, q2, includeBoundary = true) {
+  const o1 = area(p1, q1, p2);
+  const o2 = area(p1, q1, q2);
+  const o3 = area(p2, q2, p1);
+  const o4 = area(p2, q2, q1);
+  if ((o1 > 0 && o2 < 0 || o1 < 0 && o2 > 0) && (o3 > 0 && o4 < 0 || o3 < 0 && o4 > 0))
+    return true;
+  if (!includeBoundary) return false;
+  if (o1 === 0 && onSegment(p1, p2, q1)) return true;
+  if (o2 === 0 && onSegment(p1, q2, q1)) return true;
+  if (o3 === 0 && onSegment(p2, p1, q2)) return true;
+  if (o4 === 0 && onSegment(p2, q1, q2)) return true;
+  return false;
+}
+function onSegment(p, q, r) {
+  return q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y);
+}
+function intersectsPolygon(a, b) {
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  let p = a;
+  do {
+    const n = p.next;
+    if (p.x > maxX && n.x > maxX || p.x < minX && n.x < minX || p.y > maxY && n.y > maxY || p.y < minY && n.y < minY) {
+      p = n;
+      continue;
+    }
+    if (p.i !== a.i && n.i !== a.i && p.i !== b.i && n.i !== b.i && intersects(p, n, a, b))
+      return true;
+    p = n;
+  } while (p !== a);
+  return false;
+}
+function locallyInside(a, b) {
+  return area(a.prev, a, a.next) < 0 ? area(a, b, a.next) >= 0 && area(a, a.prev, b) >= 0 : area(a, b, a.prev) < 0 || area(a, a.next, b) < 0;
+}
+function middleInside(a, b) {
+  let p = a;
+  let inside = false;
+  const px = (a.x + b.x) / 2;
+  const py = (a.y + b.y) / 2;
+  do {
+    const n = p.next;
+    if (p.y > py !== n.y > py && px < (n.x - p.x) * (py - p.y) / (n.y - p.y) + p.x)
+      inside = !inside;
+    p = n;
+  } while (p !== a);
+  return inside;
+}
+function splitPolygon(a, b) {
+  const a2 = createNode(a.i, a.x, a.y), b2 = createNode(b.i, b.x, b.y), an = a.next, bp = b.prev;
+  a.next = b;
+  b.prev = a;
+  a2.next = an;
+  an.prev = a2;
+  b2.next = a2;
+  a2.prev = b2;
+  bp.next = b2;
+  b2.prev = bp;
+  return b2;
+}
+function insertNode(i, x, y, last) {
+  const p = createNode(i, x, y);
+  if (!last) {
+    p.prev = p;
+    p.next = p;
+  } else {
+    p.next = last.next;
+    p.prev = last;
+    last.next.prev = p;
+    last.next = p;
+  }
+  return p;
+}
+function removeNode(p) {
+  p.next.prev = p.prev;
+  p.prev.next = p.next;
+  if (p.prevZ) p.prevZ.nextZ = p.nextZ;
+  if (p.nextZ) p.nextZ.prevZ = p.prevZ;
+  if (indexActive) growBlock(p.prev, p.next);
+}
+function createNode(i, x, y) {
+  return (
+    /** @type {Node} */
+    /** @type {unknown} */
+    {
+      i,
+      // vertex index in coordinates array
+      x,
+      y,
+      // vertex coordinates
+      prev: null,
+      // previous and next vertex nodes in a polygon ring
+      next: null,
+      z: 0,
+      // z-order curve value; doubles as owning block in the hole-bridge index during eliminateHoles
+      prevZ: null,
+      // previous and next nodes in z-order
+      nextZ: null
+    }
+  );
+}
+function signedArea2(data, start, end, dim) {
+  let sum = 0;
+  for (let i = start, j = end - dim; i < end; i += dim) {
+    sum += (data[j] - data[i]) * (data[i + 1] + data[j + 1]);
+    j = i;
+  }
+  return sum;
+}
 
 // src/js/style.js
 var style_default = [
@@ -1912,6 +1912,66 @@ var scale = (z) => {
   return Math.pow(2, z) * 3e-5;
 };
 
+// src/js/makePipline.js
+var makePipline_default = (device, commonBindGroupLayout, tileBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, arrayStride, attributes, topology, fEntryPoint = "fs_main") => {
+  return device.createRenderPipeline({
+    // layout: "auto" の代わりに、2つの設計図を配列で渡す
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
+    }),
+    vertex: {
+      module: shaderModule,
+      entryPoint: vEntryPoint,
+      buffers: [
+        {
+          arrayStride,
+          stepMode: "vertex",
+          attributes: attributes.map((a, i) => {
+            return {
+              shaderLocation: i,
+              offset: a[0],
+              format: a[1]
+            };
+          })
+        }
+      ]
+    },
+    fragment: {
+      module: shaderModule,
+      entryPoint: fEntryPoint,
+      targets: [
+        {
+          format: presentationFormat,
+          // 以下の blend 設定を追加・変更する
+          blend: {
+            color: {
+              srcFactor: "src-alpha",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add"
+            },
+            alpha: {
+              srcFactor: "one",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add"
+            }
+          }
+        }
+      ]
+    },
+    primitive: { topology },
+    depthStencil: {
+      format: "depth24plus",
+      depthWriteEnabled: true,
+      // ★通常通り深度を書き込む
+      depthCompare: "greater"
+    },
+    multisample: {
+      count: 4
+      // ★パイプライン側でも4倍を明示
+    }
+  });
+};
+
 // src/js/worker.js
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -1983,184 +2043,55 @@ async function init(canvas, size, viewArray) {
     ]
   });
   const shaderModule = device.createShaderModule({ code: shader_default });
-  const fragment = {
-    module: shaderModule,
-    entryPoint: "fs_main",
-    targets: [
-      {
-        format: presentationFormat,
-        // 以下の blend 設定を追加・変更する
-        blend: {
-          color: {
-            srcFactor: "src-alpha",
-            dstFactor: "one-minus-src-alpha",
-            operation: "add"
-          },
-          alpha: {
-            srcFactor: "one",
-            dstFactor: "one-minus-src-alpha",
-            operation: "add"
-          }
-        }
-      }
-    ]
-  };
-  const polygonPipeline = device.createRenderPipeline({
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
-    }),
-    vertex: {
-      module: shaderModule,
-      entryPoint: "vs_polygon",
-      buffers: [
-        {
-          arrayStride: 8,
-          stepMode: "vertex",
-          attributes: [
-            {
-              shaderLocation: 0,
-              offset: 0,
-              format: "uint32"
-            },
-            {
-              shaderLocation: 1,
-              offset: 4,
-              format: "uint32"
-            }
-          ]
-        }
-      ]
-    },
-    fragment,
-    primitive: { topology: "triangle-list" },
-    depthStencil: {
-      format: "depth24plus",
-      depthWriteEnabled: true,
-      // ★通常通り深度を書き込む
-      depthCompare: "greater"
-    },
-    multisample: {
-      count: 4
-      // ★パイプライン側でも4倍を明示
-    }
-  });
-  const thinLinePipeline = device.createRenderPipeline({
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
-    }),
-    vertex: {
-      module: shaderModule,
-      entryPoint: "vs_thinline",
-      buffers: [
-        {
-          arrayStride: 8,
-          stepMode: "vertex",
-          attributes: [
-            {
-              shaderLocation: 0,
-              offset: 0,
-              format: "uint32"
-            },
-            {
-              shaderLocation: 1,
-              offset: 4,
-              format: "uint32"
-            }
-          ]
-        }
-      ]
-    },
-    fragment,
-    primitive: { topology: "line-list" },
-    depthStencil: {
-      format: "depth24plus",
-      depthWriteEnabled: false,
-      // ★深度バッファに書き込まない
-      depthCompare: "greater-equal"
-    },
-    multisample: {
-      count: 4
-      // ★パイプライン側でも4倍を明示
-    }
-  });
-  const linePipeline = device.createRenderPipeline({
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
-    }),
-    vertex: {
-      module: shaderModule,
-      entryPoint: "vs_polyline",
-      buffers: [
-        {
-          arrayStride: 16,
-          stepMode: "vertex",
-          attributes: [
-            {
-              shaderLocation: 0,
-              offset: 0,
-              format: "uint32"
-            },
-            {
-              shaderLocation: 1,
-              offset: 4,
-              format: "uint32"
-            },
-            {
-              shaderLocation: 2,
-              offset: 8,
-              format: "float32x2"
-            }
-            // {
-            //   shaderLocation: 3,
-            //   offset: 16,
-            //   format: "float32",
-            // },
-          ]
-        }
-      ]
-    },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_polyline",
-      targets: [
-        {
-          format: presentationFormat,
-          // 以下の blend 設定を追加・変更する
-          blend: {
-            color: {
-              srcFactor: "src-alpha",
-              dstFactor: "one-minus-src-alpha",
-              operation: "add"
-            },
-            alpha: {
-              srcFactor: "one",
-              dstFactor: "one-minus-src-alpha",
-              operation: "add"
-            }
-          }
-        }
-      ]
-    },
-    primitive: { topology: "triangle-list" },
-    depthStencil: {
-      format: "depth24plus",
-      depthWriteEnabled: true,
-      // ★通常通り深度を書き込む
-      depthCompare: "greater"
-    },
-    multisample: {
-      count: 4
-      // ★パイプライン側でも4倍を明示
-    }
-  });
+  const polygonPipeline = makePipline_default(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_polygon",
+    8,
+    [
+      [0, "uint32"],
+      [4, "uint32"]
+    ],
+    "triangle-list"
+  );
+  const thinLinePipeline = makePipline_default(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_thinline",
+    8,
+    [
+      [0, "uint32"],
+      [4, "uint32"]
+    ],
+    "line-list"
+  );
+  const linePipeline = makePipline_default(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_polyline",
+    16,
+    [
+      [0, "uint32"],
+      [4, "uint32"],
+      [8, "float32x2"]
+    ],
+    "triangle-list",
+    "fs_polyline"
+  );
   if (true) {
     const compilationInfo = await shaderModule.getCompilationInfo();
     for (const message of compilationInfo.messages) {
       console.error(
-        `WGSL \u30A8\u30E9\u30FC: ${message.message} at line ${message.lineNum}`
+        `WGSL error: ${message.message} at line ${message.lineNum}`
       );
     }
   }

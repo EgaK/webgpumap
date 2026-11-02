@@ -1,9 +1,10 @@
 import shaderCode from "./shader.wgsl";
-import generateSceneData from "./generateSene";
+// import generateSceneData from "./generateSene";
 import onCreateTile from "./onCreateTile";
 import loadTile from "./loadTile";
 import style from "./style";
 import { scale } from "./util/calc";
+import makePipline from "./makePipline";
 
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -95,182 +96,58 @@ async function init(canvas, size, viewArray) {
   // ==========================================
   const shaderModule = device.createShaderModule({ code: shaderCode });
 
-  const fragment = {
-    module: shaderModule,
-    entryPoint: "fs_main",
-    targets: [
-      {
-        format: presentationFormat,
-        // 以下の blend 設定を追加・変更する
-        blend: {
-          color: {
-            srcFactor: "src-alpha",
-            dstFactor: "one-minus-src-alpha",
-            operation: "add",
-          },
-          alpha: {
-            srcFactor: "one",
-            dstFactor: "one-minus-src-alpha",
-            operation: "add",
-          },
-        },
-      },
+  const polygonPipeline = makePipline(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_polygon",
+    8,
+    [
+      [0, "uint32"],
+      [4, "uint32"],
     ],
-  };
+    "triangle-list",
+  );
 
-  const polygonPipeline = device.createRenderPipeline({
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
-    }),
-    vertex: {
-      module: shaderModule,
-      entryPoint: "vs_polygon",
-      buffers: [
-        {
-          arrayStride: 8,
-          stepMode: "vertex",
-          attributes: [
-            {
-              shaderLocation: 0,
-              offset: 0,
-              format: "uint32",
-            },
-            {
-              shaderLocation: 1,
-              offset: 4,
-              format: "uint32",
-            },
-          ],
-        },
-      ],
-    },
-    fragment: fragment,
-    primitive: { topology: "triangle-list" },
-    depthStencil: {
-      format: "depth24plus",
-      depthWriteEnabled: true, // ★通常通り深度を書き込む
-      depthCompare: "greater",
-    },
-    multisample: {
-      count: 4, // ★パイプライン側でも4倍を明示
-    },
-  });
+  const thinLinePipeline = makePipline(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_thinline",
+    8,
+    [
+      [0, "uint32"],
+      [4, "uint32"],
+    ],
+    "line-list",
+  );
 
-  const thinLinePipeline = device.createRenderPipeline({
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
-    }),
-    vertex: {
-      module: shaderModule,
-      entryPoint: "vs_thinline",
-      buffers: [
-        {
-          arrayStride: 8,
-          stepMode: "vertex",
-          attributes: [
-            {
-              shaderLocation: 0,
-              offset: 0,
-              format: "uint32",
-            },
-            {
-              shaderLocation: 1,
-              offset: 4,
-              format: "uint32",
-            },
-          ],
-        },
-      ],
-    },
-    fragment: fragment,
-    primitive: { topology: "line-list" },
-    depthStencil: {
-      format: "depth24plus",
-      depthWriteEnabled: false, // ★深度バッファに書き込まない
-      depthCompare: "greater-equal",
-    },
-    multisample: {
-      count: 4, // ★パイプライン側でも4倍を明示
-    },
-  });
-
-  const linePipeline = device.createRenderPipeline({
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
-    }),
-    vertex: {
-      module: shaderModule,
-      entryPoint: "vs_polyline",
-      buffers: [
-        {
-          arrayStride: 16,
-          stepMode: "vertex",
-          attributes: [
-            {
-              shaderLocation: 0,
-              offset: 0,
-              format: "uint32",
-            },
-            {
-              shaderLocation: 1,
-              offset: 4,
-              format: "uint32",
-            },
-            {
-              shaderLocation: 2,
-              offset: 8,
-              format: "float32x2",
-            },
-            // {
-            //   shaderLocation: 3,
-            //   offset: 16,
-            //   format: "float32",
-            // },
-          ],
-        },
-      ],
-    },
-    fragment: {
-      module: shaderModule,
-      entryPoint: "fs_polyline",
-      targets: [
-        {
-          format: presentationFormat,
-          // 以下の blend 設定を追加・変更する
-          blend: {
-            color: {
-              srcFactor: "src-alpha",
-              dstFactor: "one-minus-src-alpha",
-              operation: "add",
-            },
-            alpha: {
-              srcFactor: "one",
-              dstFactor: "one-minus-src-alpha",
-              operation: "add",
-            },
-          },
-        },
-      ],
-    },
-    primitive: { topology: "triangle-list" },
-    depthStencil: {
-      format: "depth24plus",
-      depthWriteEnabled: true, // ★通常通り深度を書き込む
-      depthCompare: "greater",
-    },
-    multisample: {
-      count: 4, // ★パイプライン側でも4倍を明示
-    },
-  });
+  const linePipeline = makePipline(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_polyline",
+    16,
+    [
+      [0, "uint32"],
+      [4, "uint32"],
+      [8, "float32x2"],
+    ],
+    "triangle-list",
+    "fs_polyline",
+  );
 
   if (DEVELOP) {
     const compilationInfo = await shaderModule.getCompilationInfo();
     for (const message of compilationInfo.messages) {
       console.error(
-        `WGSL エラー: ${message.message} at line ${message.lineNum}`,
+        `WGSL error: ${message.message} at line ${message.lineNum}`,
       );
     }
   }

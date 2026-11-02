@@ -158,7 +158,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
 
 @fragment
 fn fs_polyline(input: VertexOutput) -> @location(0) vec4f {
-  if(length(input.pos)>0 && length(input.normal) < 0.5 && ((input.pos.y + 1) * 20) % 2 < 0.5){
+  if(length(input.pos)>0 && length(input.normal) < 0.5 && ((input.pos.y + 1) * 20) % 2 > 0.5){
     discard;
   }
   return input.color;

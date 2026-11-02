@@ -52,7 +52,7 @@ async function jsBuild() {
     });
   }
 
-  if (!isProd) {
+  if (false) {
     await esbuild.build({
       entryPoints: {
         "worker": "src/js/worker.js",
