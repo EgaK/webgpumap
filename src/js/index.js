@@ -24,11 +24,14 @@ const worker = new Worker(workerUrl);
 // const worker = new Worker("/js/worker.js");
 worker.postMessage({ "c": offcanvas, "s": [800, 800], "b": sab }, [offcanvas]);
 
-// const canvas = document.getElementById("a");
-// const offcanvas = canvas.transferControlToOffscreen();
-//
-// const worker = new Worker("/js/worker.min.js");
-// worker.postMessage({ canvas: offcanvas }, [offcanvas]);
+$(worker).on("message", (e) => {
+  if (e.data["e"]) {
+    alert(e.data["e"]);
+  }
+  if (e.data["d"]) {
+    console.log("main received data:", e.data["d"]);
+  }
+});
 
 mouseevents(viewArray);
 

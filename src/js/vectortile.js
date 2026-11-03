@@ -107,7 +107,10 @@ export class VectorTileFeature {
 
     if (line) lines.push(line);
 
-    return lines;
+    return {
+      lines,
+      properties: this.properties,
+    };
   }
 
   bbox() {

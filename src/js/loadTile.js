@@ -1,6 +1,7 @@
 import { VectorTile } from "./vectortile";
 import Pbf from "./pbf/pbf";
 import earcut from "./util/earcut.dev";
+import message from "./util/message";
 
 import style from "./style";
 
@@ -30,12 +31,9 @@ export default async (zxy) => {
     var layerName = styleProp.Layer;
     var layer = layers[layerName];
     if (!layer) continue;
-    if (styleProp.Type == "p") {
-      // signs.push(makeFeatures(layer, styleProp, zxy));
-    } else if (styleProp.Type == "s") {
-      // symbs.push(makeFeatures(layer, styleProp, zxy));
+    if (/p|s/.test(styleProp.Type)) {
+      makeFeatures(layer, styleProp, zxy);
     } else {
-      // if (/w|r4|r3/.test(layerName)) continue;
       processMVTLayer(layer, styleProp);
     }
   }
@@ -49,6 +47,37 @@ export default async (zxy) => {
     thinVertex,
     thinIndex,
   };
+
+  function makeFeatures(layer, prop, zxy) {
+    const f = [];
+    for (var i = 0; i < layer.length; i++) {
+      const feature = layer.feature(i);
+      const geometry = feature.loadGeometry();
+      const cat = geometry.properties["c"];
+      let desc = geometry.properties["t"];
+      if (cat == "bs" && desc) {
+        desc = desc.replace("S", "西肥バス").replace("W", "昭和バス");
+      }
+      f.push({
+        "p": geometry.lines[0][0],
+        "t": feature.properties["n"],
+        "d": desc,
+        "c": cat,
+      });
+    }
+    message("d", {
+      "f": f,
+      "p": {
+        "type": prop.Type,
+        "layer": prop.Layer,
+        "color": prop.Color,
+        "size": prop.Size,
+        "opacity": prop.OPacity,
+        "css": prop.Css,
+      },
+      "z": zxy,
+    });
+  }
 
   // リングが時計回り（外枠）かどうかを判定するヘルパー関数
   function isClockwise(ring) {
@@ -73,7 +102,7 @@ export default async (zxy) => {
         // console.log("feature.type", feature.type, feature);
         if (feature.type !== 3) continue; // Polygon 以外はスキップ
 
-        const geometry = feature.loadGeometry(); // [[[x,y], ...], ...]
+        const geometry = feature.loadGeometry().lines;
         // console.log(geometry);
         let currentPolygonRings = [];
 
@@ -122,7 +151,7 @@ export default async (zxy) => {
         // console.log("feature.type", feature.type, feature);
         if (feature.type !== 2) continue; // Polygon 以外はスキップ
 
-        const geometry = feature.loadGeometry(); // [[[x,y], ...], ...]
+        const geometry = feature.loadGeometry().lines;
         for (const ring of geometry) {
           if (ring.length === 0) continue;
 

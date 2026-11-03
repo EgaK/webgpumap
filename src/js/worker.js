@@ -5,6 +5,7 @@ import loadTile from "./loadTile";
 import style from "./style";
 import { scale } from "./util/calc";
 import makePipline from "./makePipline";
+import message from "./util/message";
 
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -19,10 +20,7 @@ async function init(canvas, size, viewArray) {
   const device = await adapter?.requestDevice();
 
   if (!device) {
-    self.postMessage({
-      type: "error",
-      message: "WebGPU をサポートしていないブラウザ、または環境です。",
-    });
+    message("e", "WebGPU をサポートしていないブラウザ、または環境です。");
     return;
   }
 
@@ -160,6 +158,7 @@ async function init(canvas, size, viewArray) {
 
   let styleTable = [];
   for (const s of style) {
+    if (/p|s/.test(s.Type)) continue;
     if (Array.isArray(s.thickness)) {
       styleTable.push(...s.thickness.flat());
       s.thickness = -(~~styleTable.length / 4);
@@ -187,13 +186,19 @@ async function init(canvas, size, viewArray) {
 
   // 初回のデータ生成を実行
   // const tileData = await generateSceneData();
-  var tileData = await loadTile([15, 28191, 13180]);
-  console.log("tileData", tileData);
-  const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
+
+  const visibleTiles = [];
+  var zxys = [[15, 28191, 13180]];
+  for (const zxy of zxys) {
+    var tileData = await loadTile(zxy);
+    console.log("tileData", tileData);
+    const drawData = onCreateTile(device, tileBindGroupLayout, tileData);
+    visibleTiles.push(drawData);
+  }
   console.log("tiles", visibleTiles);
   // ユニフォームバッファを更新する関数を作成
   function updateCamera() {
-    // 1. offsetとzoom, flagw（16バイト分）を、GPUバッファの先頭（オフセット0）に直接転送
+    // 1. offsetとzoom, flagw（16バイト分）を、GPUバッファの先頭（オフセット64）に直接転送
 
     device.queue.writeBuffer(
       uniformBuffer,

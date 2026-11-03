@@ -462,7 +462,10 @@ var VectorTileFeature = class {
       }
     }
     if (line) lines.push(line);
-    return lines;
+    return {
+      lines,
+      properties: this.properties
+    };
   }
   bbox() {
     if (this._geometry < 0) {
@@ -1489,6 +1492,15 @@ function signedArea2(data, start, end, dim) {
   return sum;
 }
 
+// src/js/util/message.js
+var message_default = (...args) => {
+  const obj = {};
+  for (var i = 0; i < args.length; i += 2) {
+    obj[args[i]] = args[i + 1];
+  }
+  self.postMessage(obj);
+};
+
 // src/js/style.js
 var style_default = [
   {
@@ -1723,8 +1735,8 @@ var loadTile_default = async (zxy) => {
     var layerName = styleProp.Layer;
     var layer = layers[layerName];
     if (!layer) continue;
-    if (styleProp.Type == "p") {
-    } else if (styleProp.Type == "s") {
+    if (/p|s/.test(styleProp.Type)) {
+      makeFeatures(layer, styleProp, zxy);
     } else {
       processMVTLayer(layer, styleProp);
     }
@@ -1739,6 +1751,36 @@ var loadTile_default = async (zxy) => {
     thinVertex,
     thinIndex
   };
+  function makeFeatures(layer2, prop, zxy2) {
+    const f = [];
+    for (var i = 0; i < layer2.length; i++) {
+      const feature = layer2.feature(i);
+      const geometry = feature.loadGeometry();
+      const cat = geometry.properties["c"];
+      let desc = geometry.properties["t"];
+      if (cat == "bs" && desc) {
+        desc = desc.replace("S", "\u897F\u80A5\u30D0\u30B9").replace("W", "\u662D\u548C\u30D0\u30B9");
+      }
+      f.push({
+        "p": geometry.lines[0][0],
+        "t": feature.properties["n"],
+        "d": desc,
+        "c": cat
+      });
+    }
+    message_default("d", {
+      "f": f,
+      "p": {
+        "type": prop.Type,
+        "layer": prop.Layer,
+        "color": prop.Color,
+        "size": prop.Size,
+        "opacity": prop.OPacity,
+        "css": prop.Css
+      },
+      "z": zxy2
+    });
+  }
   function isClockwise(ring) {
     let sum = 0;
     for (let i = 0; i < ring.length; i++) {
@@ -1757,7 +1799,7 @@ var loadTile_default = async (zxy) => {
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
         if (feature.type !== 3) continue;
-        const geometry = feature.loadGeometry();
+        const geometry = feature.loadGeometry().lines;
         let currentPolygonRings = [];
         for (const ring of geometry) {
           if (ring.length === 0) continue;
@@ -1793,7 +1835,7 @@ var loadTile_default = async (zxy) => {
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
         if (feature.type !== 2) continue;
-        const geometry = feature.loadGeometry();
+        const geometry = feature.loadGeometry().lines;
         for (const ring of geometry) {
           if (ring.length === 0) continue;
           const formattedRing = ring.map((p) => [p.x, p.y]);
@@ -1980,10 +2022,7 @@ async function init(canvas, size, viewArray) {
   const adapter = await navigator.gpu?.requestAdapter();
   const device = await adapter?.requestDevice();
   if (!device) {
-    self.postMessage({
-      type: "error",
-      message: "WebGPU \u3092\u30B5\u30DD\u30FC\u30C8\u3057\u3066\u3044\u306A\u3044\u30D6\u30E9\u30A6\u30B6\u3001\u307E\u305F\u306F\u74B0\u5883\u3067\u3059\u3002"
-    });
+    message_default("e", "WebGPU \u3092\u30B5\u30DD\u30FC\u30C8\u3057\u3066\u3044\u306A\u3044\u30D6\u30E9\u30A6\u30B6\u3001\u307E\u305F\u306F\u74B0\u5883\u3067\u3059\u3002");
     return;
   }
   if (true) {
@@ -2099,6 +2138,7 @@ async function init(canvas, size, viewArray) {
   });
   let styleTable = [];
   for (const s of style_default) {
+    if (/p|s/.test(s.Type)) continue;
     if (Array.isArray(s.thickness)) {
       styleTable.push(...s.thickness.flat());
       s.thickness = -(~~styleTable.length / 4);
@@ -2118,9 +2158,14 @@ async function init(canvas, size, viewArray) {
       // 実体バッファ
     ]
   });
-  var tileData = await loadTile_default([15, 28191, 13180]);
-  console.log("tileData", tileData);
-  const visibleTiles = [onCreateTile(device, tileBindGroupLayout, tileData)];
+  const visibleTiles = [];
+  var zxys = [[15, 28191, 13180]];
+  for (const zxy of zxys) {
+    var tileData = await loadTile_default(zxy);
+    console.log("tileData", tileData);
+    const drawData = onCreateTile(device, tileBindGroupLayout, tileData);
+    visibleTiles.push(drawData);
+  }
   console.log("tiles", visibleTiles);
   function updateCamera() {
     device.queue.writeBuffer(
