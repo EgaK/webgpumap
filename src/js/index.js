@@ -56,7 +56,3 @@ $("#resize2").on("click", () => {
   worker.postMessage({ "s": [width * pixelRatio, height * pixelRatio] });
   viewArray[3] = 1;
 });
-
-canvas.on("click", (e) => {
-  console.log("clicked", e.clientX, e.clientY);
-});

@@ -120,38 +120,38 @@ async function init(viewArray) {
     "triangle-list",
   );
 
-  // const thinLinePipeline = makePipline(
-  //   device,
-  //   commonBindGroupLayout,
-  //   tileBindGroupLayout,
-  //   presentationFormat,
-  //   shaderModule,
-  //   "vs_thinline",
-  //   16,
-  //   [
-  //     [0, "sint32x2"],
-  //     [8, "sint32"],
-  //   ],
-  //   "line-list",
-  // );
+  const thinLinePipeline = makePipline(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_thinline",
+    16,
+    [
+      [0, "sint32x2"],
+      [8, "sint32"],
+    ],
+    "line-list",
+  );
 
-  // const linePipeline = makePipline(
-  //   device,
-  //   commonBindGroupLayout,
-  //   tileBindGroupLayout,
-  //   presentationFormat,
-  //   shaderModule,
-  //   "vs_polyline",
-  //   32,
-  //   [
-  //     [0, "sint32x2"],
-  //     [8, "sint32"],
-  //     [12, "uint32"], // pad用 将来なにかに使ってね
-  //     [16, "float32x2"],
-  //   ],
-  //   "triangle-list",
-  //   "fs_polyline",
-  // );
+  const linePipeline = makePipline(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_polyline",
+    32,
+    [
+      [0, "sint32x2"],
+      [8, "sint32"],
+      [12, "uint32"], // pad用 将来なにかに使ってね
+      [16, "float32x2"],
+    ],
+    "triangle-list",
+    "fs_polyline",
+  );
 
   if (DEVELOP) {
     const compilationInfo = await shaderModule.getCompilationInfo();
@@ -182,7 +182,7 @@ async function init(viewArray) {
 
   // console.log("style", styleTable, style);
 
-  device.queue.writeBuffer(uniformBuffer, 32, new Float32Array(styleTable));
+  device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(styleTable));
 
   // ==========================================
   // 3. 設計図（共通レイアウト）に、実際の一時バッファを紐付ける
@@ -210,9 +210,16 @@ async function init(viewArray) {
     visibleTiles.push(drawData);
   }
   console.log("tiles", visibleTiles);
+
   // ユニフォームバッファを更新する関数を作成
   function updateCamera(zxy, buffer) {
-    // 1. offsetとzoom, flagw（16バイト分）を、GPUバッファの先頭（オフセット64）に直接転送
+    // Uniformにはzoom情報のみ
+    device.queue.writeBuffer(
+      uniformBuffer,
+      0,
+      new Float32Array([viewArray[2]]),
+    );
+
     const matrix = computeTileMatrix3x2(
       ...zxy,
       4096,
@@ -265,19 +272,19 @@ async function init(viewArray) {
       renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       // ボーダー
-      // renderPass.setPipeline(thinLinePipeline);
-      // renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
-      // renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
+      renderPass.setPipeline(thinLinePipeline);
+      renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       // ポリライン;
-      // renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-      // renderPass.setPipeline(linePipeline);
-      // renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
-      // renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
+      renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
+      renderPass.setPipeline(linePipeline);
+      renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       // 細いポリライン
-      // renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-      // renderPass.setPipeline(thinLinePipeline);
-      // renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
-      // renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
+      renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
+      renderPass.setPipeline(thinLinePipeline);
+      renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
+      renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }
 
     renderPass.end();
