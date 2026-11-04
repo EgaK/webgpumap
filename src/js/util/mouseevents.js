@@ -1,7 +1,7 @@
 import { scale } from "./calc";
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
-let scaleZ = scale(16);
+let scaleZ = scale(15);
 
 export default (viewArray) => {
   const canvas = document.getElementById("a");
@@ -10,7 +10,7 @@ export default (viewArray) => {
   const view = () => {
     requestAnimationFrame(view);
     if (!viewArray[3]) return;
-    v.innerText = `zoom: ${viewArray[2].toFixed(2)}, x:${viewArray[0].toFixed(2)}, y:${viewArray[1].toFixed(2)}`;
+    v.innerText = `zoom: ${viewArray[2].toFixed(2)}, x:${viewArray[0].toFixed(8)}, y:${viewArray[1].toFixed(8)}`;
   };
   view();
   // ------------------------------------------
@@ -70,15 +70,9 @@ export default (viewArray) => {
     const deltaX = e.clientX - previousMousePosition.x;
     const deltaY = e.clientY - previousMousePosition.y;
 
-    // スクリーン移動量をNDC空間の移動量に変換
-    const ndcX =
-      (deltaX / canvas.width) * 2 * (canvas.width / window.innerWidth);
-    const ndcY =
-      -(deltaY / canvas.height) * 2 * (canvas.height / window.innerHeight);
-
     // ズーム倍率に応じて移動量を調整
-    viewArray[0] -= ndcX / scaleZ;
-    viewArray[1] -= ndcY / scaleZ;
+    viewArray[0] -= deltaX / scaleZ;
+    viewArray[1] -= deltaY / scaleZ;
 
     previousMousePosition = { x: e.clientX, y: e.clientY };
 

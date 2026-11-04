@@ -1,4 +1,9 @@
-export default function onCreateTile(device, tileBindGroupLayout, tileData) {
+export default function onCreateTile(
+  device,
+  tileBindGroupLayout,
+  tileData,
+  zxy,
+) {
   // そのタイル固有のpropertyBuffer（GPUバッファ）を作成・転送
   let STRIDE = 32; // propStructs は1要素48バイト
   const propertyBufferSize = tileData.propStructs.length * STRIDE;
@@ -84,18 +89,24 @@ export default function onCreateTile(device, tileBindGroupLayout, tileData) {
   const thinIndexData = new Uint32Array(tileData.thinIndex);
   device.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
 
+  const transformBuffer = device.createBuffer({
+    size: 24, // mat3x2 のサイズ
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
   // そのタイル固有のBindGroup（グループ1の実体）を作成
   const bindGroup = device.createBindGroup({
     layout: tileBindGroupLayout, // グループ1の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: propertyBuffer } }, // タイル個別のバッファを紐付け
+      { binding: 0, resource: { buffer: transformBuffer } }, // 実体バッファ
+      { binding: 1, resource: { buffer: propertyBuffer } }, // タイル個別のバッファを紐付け
     ],
   });
 
   return {
+    zxy,
     bindGroup,
-    propStructs: tileData.propStructs,
-    propertyBuffer,
+    transformBuffer,
     polygonVertexBuffer,
     polygonIndexBuffer,
     polygonIndexCount: tileData.polygonIndex.length,

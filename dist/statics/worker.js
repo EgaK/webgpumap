@@ -1,11 +1,11 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)feature_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)feature_id:i32,@location(2)pad:u32,@location(3)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Style{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{u_mvp_matrix:mat4x4<f32>,u_offset:vec2<f32>,u_zoom:f32,u_scale:f32,u_res_x:f32,u_res_y:f32,u_tile_z:u32,u_tile_x:u32,u_tile_y:u32,u_tile_extent:f32,u_tile_opacity:f32,pad0:f32,pad1:f32,pad2:f32,pad3:f32,pad4:f32,styles:array<Style,8>,};@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn raw_to_ndc(pos:vec2i)->vec2f{let normalized_x=f32(pos.x)/4096.0;let normalized_y=1.0-(f32(pos.y)/4096.0);return vec2f(normalized_x,normalized_y)*2.0-1.0;}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.styles[u32(-opacity-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let ndc_pos=raw_to_ndc(input.pos);let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var z=f32(input.feature_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let ndc_pos=raw_to_ndc(input.pos);let prop=properties[input.feature_id];let cam_pos=(ndc_pos-uniforms.u_offset)*uniforms.u_scale;var thickness=prop.thickness;if(thickness==-1){output.pos=cam_pos;}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.styles[u32(-thickness-1)];let t=clamp((uniforms.u_zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let aspect=uniforms.u_res_x/uniforms.u_res_y;let normal=normalize(vec2f(input.normal.x*aspect,input.normal.y));let thickness_ndc=thickness/uniforms.u_res_x;let offset=vec2f(normal.x*thickness_ndc*0.5/aspect,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.pos)>0&&length(input.normal)<0.5&&((input.pos.y+1)*20)% 2>0.5){discard;}return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)feature_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)feature_id:i32,@location(2)pad:u32,@location(3)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Style{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{matrix:mat3x2f,pad0:f32,pad1:f32,styles:array<Style,6>,}struct Transform{matrix:mat3x2f,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<uniform> transform:Transform;@group(1)@binding(1)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.feature_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=vec4f(prop.fillColor,1.0);return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.pos)>0&&length(input.normal)<0.5&&((input.pos.y+1)*20)% 2>0.5){discard;}return input.color;}`;
 
 // src/js/onCreateTile.js
-function onCreateTile(device, tileBindGroupLayout, tileData) {
+function onCreateTile(device2, tileBindGroupLayout, tileData, zxy) {
   let STRIDE = 32;
   const propertyBufferSize = tileData.propStructs.length * STRIDE;
-  const propertyBuffer = device.createBuffer({
+  const propertyBuffer = device2.createBuffer({
     size: propertyBufferSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
   });
@@ -20,28 +20,28 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
     ]);
     propertyData.set(new Uint8Array(buf1.buffer), offset);
   });
-  device.queue.writeBuffer(propertyBuffer, 0, propertyData);
-  const polygonVertexBuffer = device.createBuffer({
+  device2.queue.writeBuffer(propertyBuffer, 0, propertyData);
+  const polygonVertexBuffer = device2.createBuffer({
     size: tileData.polygonVertex.length * 16,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
   const polygonVertexData = new Int32Array(tileData.polygonVertex);
-  device.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
-  const polygonIndexBuffer = device.createBuffer({
+  device2.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
+  const polygonIndexBuffer = device2.createBuffer({
     size: tileData.polygonIndex.length * 4,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
   const polygonIndexData = new Uint32Array(tileData.polygonIndex);
-  device.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
-  const borderIndexBuffer = device.createBuffer({
+  device2.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
+  const borderIndexBuffer = device2.createBuffer({
     size: tileData.borderIndex.length * 4,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
   const borderIndexData = new Uint32Array(tileData.borderIndex);
-  device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
+  device2.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
   STRIDE = 32;
   const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
-  const lineVertexBuffer = device.createBuffer({
+  const lineVertexBuffer = device2.createBuffer({
     size: lineVertexBufferSize,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
@@ -53,37 +53,44 @@ function onCreateTile(device, tileBindGroupLayout, tileData) {
     lineVertexData.set(new Uint8Array(buf1.buffer), offset);
     lineVertexData.set(new Uint8Array(buf2.buffer), offset + 16);
   });
-  device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
-  const lineIndexBuffer = device.createBuffer({
+  device2.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
+  const lineIndexBuffer = device2.createBuffer({
     size: tileData.lineIndex.length * 4,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
   const lineIndexData = new Uint32Array(tileData.lineIndex);
-  device.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
-  const thinVertexBuffer = device.createBuffer({
+  device2.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
+  const thinVertexBuffer = device2.createBuffer({
     size: tileData.thinVertex.length * 16,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
   const thinVertexData = new Int32Array(tileData.thinVertex);
-  device.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
-  const thinIndexBuffer = device.createBuffer({
+  device2.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
+  const thinIndexBuffer = device2.createBuffer({
     size: tileData.thinIndex.length * 4,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
   const thinIndexData = new Uint32Array(tileData.thinIndex);
-  device.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
-  const bindGroup = device.createBindGroup({
+  device2.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
+  const transformBuffer = device2.createBuffer({
+    size: 24,
+    // mat3x2 のサイズ
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+  });
+  const bindGroup = device2.createBindGroup({
     layout: tileBindGroupLayout,
     // グループ1の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: propertyBuffer } }
+      { binding: 0, resource: { buffer: transformBuffer } },
+      // 実体バッファ
+      { binding: 1, resource: { buffer: propertyBuffer } }
       // タイル個別のバッファを紐付け
     ]
   });
   return {
+    zxy,
     bindGroup,
-    propStructs: tileData.propStructs,
-    propertyBuffer,
+    transformBuffer,
     polygonVertexBuffer,
     polygonIndexBuffer,
     polygonIndexCount: tileData.polygonIndex.length,
@@ -505,11 +512,11 @@ var VectorTileFeature = class {
    * @return {Feature}
    */
   toGeoJSON(x, y, z) {
-    const size = this.extent * Math.pow(2, z), x0 = this.extent * x, y0 = this.extent * y, vtCoords = this.loadGeometry();
+    const size2 = this.extent * Math.pow(2, z), x0 = this.extent * x, y0 = this.extent * y, vtCoords = this.loadGeometry();
     function projectPoint(p) {
       return [
-        (p.x + x0) * 360 / size - 180,
-        360 / Math.PI * Math.atan(Math.exp((1 - (p.y + y0) * 2 / size) * Math.PI)) - 90
+        (p.x + x0) * 360 / size2 - 180,
+        360 / Math.PI * Math.atan(Math.exp((1 - (p.y + y0) * 2 / size2) * Math.PI)) - 90
       ];
     }
     function projectLine(line) {
@@ -1945,16 +1952,11 @@ var loadTile_default = async (zxy) => {
   }
 };
 
-// src/js/util/calc.js
-var scale = (z) => {
-  return Math.pow(2, z) * 3e-5;
-};
-
 // src/js/makePipline.js
-var makePipline_default = (device, commonBindGroupLayout, tileBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, arrayStride, attributes, topology, fEntryPoint = "fs_main") => {
-  return device.createRenderPipeline({
+var makePipline_default = (device2, commonBindGroupLayout, tileBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, arrayStride, attributes, topology, fEntryPoint = "fs_main") => {
+  return device2.createRenderPipeline({
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
-    layout: device.createPipelineLayout({
+    layout: device2.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
     }),
     vertex: {
@@ -2011,16 +2013,29 @@ var makePipline_default = (device, commonBindGroupLayout, tileBindGroupLayout, p
 };
 
 // src/js/worker.js
+var canvas;
+var size;
+var device;
+var uniformBuffer;
+var msaaColorTexture;
+var msaaDepthTexture;
 self.onmessage = async (e) => {
   if (e.data["c"]) {
+    canvas = e.data["c"];
+    size = e.data["s"];
     const sab = e.data["b"];
     const viewArray = new Float32Array(sab);
-    init(e.data["c"], e.data["s"], viewArray);
+    init(viewArray);
+  } else if (e.data["s"]) {
+    size = e.data["s"];
+    canvas.width = size[0];
+    canvas.height = size[1];
+    updateCanvasSize(size);
   }
 };
-async function init(canvas, size, viewArray) {
+async function init(viewArray) {
   const adapter = await navigator.gpu?.requestAdapter();
-  const device = await adapter?.requestDevice();
+  device = await adapter?.requestDevice();
   if (!device) {
     message_default("e", "WebGPU \u3092\u30B5\u30DD\u30FC\u30C8\u3057\u3066\u3044\u306A\u3044\u30D6\u30E9\u30A6\u30B6\u3001\u307E\u305F\u306F\u74B0\u5883\u3067\u3059\u3002");
     return;
@@ -2065,16 +2080,15 @@ async function init(canvas, size, viewArray) {
     entries: [
       {
         binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: { type: "uniform" }
+        // Uniformバッファが入りますよという宣言
+      },
+      {
+        binding: 1,
         visibility: GPUShaderStage.VERTEX,
-        // 頂点シェーダーで使う場合
         buffer: { type: "read-only-storage" }
-        // ストレージバッファ(読み込み専用)が入りますよという宣言
       }
-      // {
-      //   binding: 1,
-      //   visibility: GPUShaderStage.VERTEX,
-      //   buffer: { type: "read-only-storage" },
-      // },
     ]
   });
   const shaderModule = device.createShaderModule({ code: shader_default });
@@ -2092,38 +2106,6 @@ async function init(canvas, size, viewArray) {
     ],
     "triangle-list"
   );
-  const thinLinePipeline = makePipline_default(
-    device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_thinline",
-    16,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"]
-    ],
-    "line-list"
-  );
-  const linePipeline = makePipline_default(
-    device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_polyline",
-    32,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"],
-      [12, "uint32"],
-      // pad用 将来なにかに使ってね
-      [16, "float32x2"]
-    ],
-    "triangle-list",
-    "fs_polyline"
-  );
   if (true) {
     const compilationInfo = await shaderModule.getCompilationInfo();
     for (const message of compilationInfo.messages) {
@@ -2132,8 +2114,8 @@ async function init(canvas, size, viewArray) {
       );
     }
   }
-  const uniformBuffer = device.createBuffer({
-    size: 256,
+  uniformBuffer = device.createBuffer({
+    size: 128,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
   let styleTable = [];
@@ -2148,8 +2130,7 @@ async function init(canvas, size, viewArray) {
       s.OPacity = -(~~styleTable.length / 4);
     }
   }
-  console.log("style", styleTable, style_default);
-  device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
+  device.queue.writeBuffer(uniformBuffer, 32, new Float32Array(styleTable));
   const globalBindGroup = device.createBindGroup({
     layout: commonBindGroupLayout,
     // グループ0の設計図を指定
@@ -2159,55 +2140,32 @@ async function init(canvas, size, viewArray) {
     ]
   });
   const visibleTiles = [];
-  var zxys = [[15, 28191, 13180]];
+  var zxys = [
+    [15, 28191, 13180],
+    [15, 28192, 13180]
+  ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);
     console.log("tileData", tileData);
-    const drawData = onCreateTile(device, tileBindGroupLayout, tileData);
+    const drawData = onCreateTile(device, tileBindGroupLayout, tileData, zxy);
     visibleTiles.push(drawData);
   }
   console.log("tiles", visibleTiles);
-  function updateCamera() {
-    device.queue.writeBuffer(
-      uniformBuffer,
-      64,
-      new Float32Array([
-        viewArray[0],
-        viewArray[1],
-        viewArray[2],
-        scale(viewArray[2])
-        //flagはシェーダでは必要ないのでscaleとして使用する
-      ])
+  function updateCamera(zxy, buffer) {
+    const matrix = computeTileMatrix3x2(
+      ...zxy,
+      4096,
+      viewArray[0],
+      viewArray[1],
+      viewArray[2],
+      ...size
     );
+    device.queue.writeBuffer(buffer, 0, matrix);
   }
-  function updateCanvasSize() {
-    device.queue.writeBuffer(
-      uniformBuffer,
-      80,
-      // 後半の16バイトの位置から書き込み
-      new Float32Array([canvas.width, canvas.height])
-    );
-  }
-  updateCamera();
-  updateCanvasSize();
-  const msaaColorTexture = device.createTexture({
-    size: [canvas.width, canvas.height],
-    sampleCount: 4,
-    // ★ここを4にする
-    format: navigator.gpu.getPreferredCanvasFormat(),
-    usage: GPUTextureUsage.RENDER_ATTACHMENT
-  });
-  const msaaDepthTexture = device.createTexture({
-    size: [canvas.width, canvas.height],
-    sampleCount: 4,
-    // ★カラーと合わせる
-    format: "depth24plus",
-    usage: GPUTextureUsage.RENDER_ATTACHMENT
-  });
+  updateCanvasSize(size);
   function render() {
     requestAnimationFrame(render);
     if (!viewArray[3]) return;
-    updateCamera();
     const commandEncoder = device.createCommandEncoder();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
@@ -2233,26 +2191,58 @@ async function init(canvas, size, viewArray) {
     });
     renderPass.setBindGroup(0, globalBindGroup);
     for (const tile of visibleTiles) {
+      updateCamera(tile.zxy, tile.transformBuffer);
       renderPass.setBindGroup(1, tile.bindGroup);
       renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
       renderPass.setPipeline(polygonPipeline);
       renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
       renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
-      renderPass.setPipeline(thinLinePipeline);
-      renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
-      renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
-      renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-      renderPass.setPipeline(linePipeline);
-      renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
-      renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
-      renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-      renderPass.setPipeline(thinLinePipeline);
-      renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
-      renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
     }
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
     viewArray[3] = 0;
   }
   render();
+}
+function computeTileMatrix3x2(tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height, tileSizePixels = 512) {
+  const totalWorldPixels = tileSizePixels * Math.pow(2, currentZoom);
+  const scaleX = totalWorldPixels / width * 2;
+  const scaleY = totalWorldPixels / height * 2;
+  const tileNum = Math.pow(2, tileZ);
+  const tileScale = 1 / tileNum;
+  const tileWorldX = tileX * tileScale;
+  const tileWorldY = tileY * tileScale;
+  const m00 = tileScale / tileExtent * scaleX;
+  const m01 = 0;
+  const m10 = 0;
+  const m11 = -(tileScale / tileExtent) * scaleY;
+  const m20 = (tileWorldX - centerX) * scaleX;
+  const m21 = -(tileWorldY - centerY) * scaleY;
+  return new Float32Array([
+    m00,
+    m01,
+    // c0
+    m10,
+    m11,
+    // c1
+    m20,
+    m21
+    // c2
+  ]);
+}
+function updateCanvasSize(size2) {
+  msaaColorTexture = device.createTexture({
+    size: size2,
+    sampleCount: 4,
+    // ★ここを4にする
+    format: navigator.gpu.getPreferredCanvasFormat(),
+    usage: GPUTextureUsage.RENDER_ATTACHMENT
+  });
+  msaaDepthTexture = device.createTexture({
+    size: size2,
+    sampleCount: 4,
+    // ★カラーと合わせる
+    format: "depth24plus",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT
+  });
 }
