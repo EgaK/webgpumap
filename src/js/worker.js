@@ -147,7 +147,7 @@ async function init(viewArray) {
     [
       [0, "sint32x2"],
       [8, "sint32"],
-      [12, "uint32"], // pad用 将来なにかに使ってね
+      [12, "sint32"], // pad用 将来なにかに使ってね
       [16, "float32x2"],
     ],
     "triangle-list",

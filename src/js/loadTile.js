@@ -1,4 +1,4 @@
-import { VectorTile } from "./vectortile";
+import { VectorTile } from "./pbf/vectortile";
 import Pbf from "./pbf/pbf";
 import earcut from "./util/earcut.dev";
 import message from "./util/message";

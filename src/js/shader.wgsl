@@ -5,7 +5,7 @@ struct PrimitiveVertex {
 struct PolylineVertex {
   @location(0) pos: vec2i,
   @location(1) feature_id: i32,
-  @location(2) pad: u32,
+  @location(2) pad: i32,
   @location(3) normal: vec2f,
 }
 struct Property {
@@ -107,7 +107,7 @@ fn vs_polyline(
 
   var thickness = prop.thickness;
   if(thickness==-1){
-    output.pos = cam_pos;
+    output.pos = vec2f(input.pos);
   } else {
     output.pos = vec2f(0,0);
   }
@@ -143,7 +143,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
 
 @fragment
 fn fs_polyline(input: VertexOutput) -> @location(0) vec4f {
-  if(length(input.pos)>0 && length(input.normal) < 0.5 && ((input.pos.y + 1) * 20) % 2 > 0.5){
+  if(length(input.pos)>0 && length(input.normal) < 0.5 && ((input.pos.y + 1) /30) % 2 > 0.5){
     discard;
   }
   return input.color;
