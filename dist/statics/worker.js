@@ -1952,6 +1952,17 @@ var loadTile_default = async (zxy) => {
   }
 };
 
+// src/js/util/constants.js
+var baseTile = {
+  baseTileZ: 10,
+  baseTileX: 879,
+  baseTileY: 410,
+  tileSizePixels: 1024
+};
+
+// src/js/util/calc.js
+var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
+
 // src/js/makePipline.js
 var makePipline_default = (device2, commonBindGroupLayout, tileBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, arrayStride, attributes, topology, fEntryPoint = "fs_main") => {
   return device2.createRenderPipeline({
@@ -2019,6 +2030,7 @@ var device;
 var uniformBuffer;
 var msaaColorTexture;
 var msaaDepthTexture;
+var { baseTileZ: baseTileZ2, baseTileX: baseTileX2, baseTileY: baseTileY2, tileSizePixels: tileSizePixels2 } = baseTile;
 self.onmessage = async (e) => {
   if (e.data["c"]) {
     canvas = e.data["c"];
@@ -2230,21 +2242,29 @@ async function init(viewArray) {
     for (const tile of visibleTiles) {
       updateCamera(tile.zxy, tile.transformBuffer);
       renderPass.setBindGroup(1, tile.bindGroup);
-      renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-      renderPass.setPipeline(polygonPipeline);
-      renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
-      renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
-      renderPass.setPipeline(thinLinePipeline);
-      renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
-      renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
-      renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-      renderPass.setPipeline(linePipeline);
-      renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
-      renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
-      renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-      renderPass.setPipeline(thinLinePipeline);
-      renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
-      renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
+      if (tile.polygonIndexCount > 0) {
+        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
+        renderPass.setPipeline(polygonPipeline);
+        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
+        renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
+      }
+      if (tile.borderIndexCount > 0) {
+        renderPass.setPipeline(thinLinePipeline);
+        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
+        renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
+      }
+      if (tile.lineIndexCount > 0) {
+        renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
+        renderPass.setPipeline(linePipeline);
+        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
+        renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
+      }
+      if (tile.thinIndexCount > 0) {
+        renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
+        renderPass.setPipeline(thinLinePipeline);
+        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
+        renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
+      }
     }
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
@@ -2252,31 +2272,25 @@ async function init(viewArray) {
   }
   render();
 }
-function computeTileMatrix3x2(tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height, tileSizePixels = 512) {
-  const totalWorldPixels = tileSizePixels * Math.pow(2, currentZoom);
-  const scaleX = totalWorldPixels / width * 2;
-  const scaleY = totalWorldPixels / height * 2;
-  const tileNum = Math.pow(2, tileZ);
-  const tileScale = 1 / tileNum;
-  const tileWorldX = tileX * tileScale;
-  const tileWorldY = tileY * tileScale;
-  const m00 = tileScale / tileExtent * scaleX;
+function computeTileMatrix3x2(tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height) {
+  const tilePixelSize = tileSizePixels2 * Math.pow(2, currentZoom - baseTileZ2);
+  const scaleX = tilePixelSize / width * 2;
+  const scaleY = tilePixelSize / height * 2;
+  const zoomDiff = tileZ - baseTileZ2;
+  const shiftedBaseX = baseTileX2 * Math.pow(2, zoomDiff);
+  const shiftedBaseY = baseTileY2 * Math.pow(2, zoomDiff);
+  const localTileX = tileX - shiftedBaseX;
+  const localTileY = tileY - shiftedBaseY;
+  const tileScaleFromBase = 1 / Math.pow(2, zoomDiff);
+  const tileLocalWorldX = localTileX * tileScaleFromBase;
+  const tileLocalWorldY = localTileY * tileScaleFromBase;
+  const m00 = tileScaleFromBase / tileExtent * scaleX;
   const m01 = 0;
   const m10 = 0;
-  const m11 = -(tileScale / tileExtent) * scaleY;
-  const m20 = (tileWorldX - centerX) * scaleX;
-  const m21 = -(tileWorldY - centerY) * scaleY;
-  return new Float32Array([
-    m00,
-    m01,
-    // c0
-    m10,
-    m11,
-    // c1
-    m20,
-    m21
-    // c2
-  ]);
+  const m11 = -(tileScaleFromBase / tileExtent) * scaleY;
+  const m20 = (tileLocalWorldX - centerX) * scaleX;
+  const m21 = -(tileLocalWorldY - centerY) * scaleY;
+  return new Float32Array([m00, m01, m10, m11, m20, m21]);
 }
 function updateCanvasSize(size2) {
   msaaColorTexture = device.createTexture({

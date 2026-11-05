@@ -1,4 +1,6 @@
 import { scale } from "./calc";
+import context from "./context";
+
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
 let scaleZ = scale(15);
@@ -21,20 +23,8 @@ export default (viewArray) => {
     (e) => {
       e.preventDefault();
 
-      // マウス位置のNDC座標を計算（マウスのある場所を中心にズームするため）
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const mouseY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-
-      const zoomFactor = 1.1;
+      // 基準ズーム(z=10)の「タイル1枚の幅」を現在の画面ピクセル数に換算したスケール
       const oldScale = scaleZ;
-
-      // if (e.deltaY < 0) {
-      //   viewArray[2] *= zoomFactor;
-      // } else {
-      //   viewArray[2] /= zoomFactor;
-      // }
-      // viewArray[2] = Math.max(100, Math.min(viewArray[2], 400.0)); // 制限
 
       var dz = e.deltaY;
       dz = dz > 5 ? 5 : dz < -5 ? -5 : dz;
@@ -45,13 +35,12 @@ export default (viewArray) => {
       viewArray[2] = z;
       scaleZ = scale(z);
 
-      // マウス位置を中心に拡大するためのオフセット調整
-      viewArray[0] += mouseX / oldScale - mouseX / scaleZ;
-      viewArray[1] += mouseY / oldScale - mouseY / scaleZ;
+      const x = context.mapWidth / 2 - e.offsetX;
+      const y = context.mapHeight / 2 - e.offsetY;
 
+      viewArray[0] -= x / oldScale - x / scaleZ;
+      viewArray[1] -= y / oldScale - y / scaleZ;
       viewArray[3] = 1;
-      // updateUniforms();
-      // render(); // 再描画
     },
     { passive: false },
   );
@@ -77,8 +66,6 @@ export default (viewArray) => {
     previousMousePosition = { x: e.clientX, y: e.clientY };
 
     viewArray[3] = 1;
-    // updateUniforms();
-    // render();
   });
 
   window.addEventListener("mouseup", () => {
