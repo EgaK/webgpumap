@@ -2170,7 +2170,6 @@ async function init(viewArray) {
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);
-    console.log("tileData", tileData);
     const drawData = onCreateTile(device, tileBindGroupLayout, tileData, zxy);
     visibleTiles.push(drawData);
   }
