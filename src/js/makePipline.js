@@ -9,8 +9,15 @@ export default (
   attributes,
   topology,
   fEntryPoint = "fs_main",
+  isMask,
+  stencil = {
+    compare: "equal", // ステンシル値が一致する場合のみ描画
+    passOp: "keep", // ステンシル値は変更しない
+    failOp: "keep",
+    depthFailOp: "keep",
+  },
 ) => {
-  return device.createRenderPipeline({
+  const obj = {
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout],
@@ -38,7 +45,6 @@ export default (
       targets: [
         {
           format: presentationFormat,
-          // 以下の blend 設定を追加・変更する
           blend: {
             color: {
               srcFactor: "src-alpha",
@@ -54,14 +60,20 @@ export default (
         },
       ],
     },
-    primitive: { topology: topology },
+    primitive: { topology: topology, cullMode: "none" },
     depthStencil: {
-      format: "depth24plus",
-      depthWriteEnabled: true, // ★通常通り深度を書き込む
-      depthCompare: "greater",
+      format: "depth24plus-stencil8",
+      depthWriteEnabled: !isMask, // ★通常通り深度を書き込む
+      depthCompare: isMask ? "always" : "greater",
+      stencilFront: stencil,
+      stencilBack: stencil,
     },
     multisample: {
       count: 4, // ★パイプライン側でも4倍を明示
     },
-  });
+  };
+  if (!arrayStride) {
+    delete obj.vertex.buffers;
+  }
+  return device.createRenderPipeline(obj);
 };

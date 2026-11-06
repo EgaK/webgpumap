@@ -27,7 +27,6 @@ struct Uniforms {
   zoom: f32,
   // ズームイン・アウトでタイルが切り替わる際、新しいタイルが「パッ」と突然現れるとチカチカして見栄えが悪くなります。多くの地図アプリは、新しいタイルを 0.2 秒ほどかけてフワッとフェードインさせています。そのための変数tile_opacity
   tile_opacity: f32,
-
   pad0: f32, pad1: f32,
   clamps: array<ClampTable, 6>, // 16バイト目から96バイト
   padvec1: vec4f,
@@ -40,7 +39,6 @@ struct Transform {
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(1) @binding(0) var<uniform> transform: Transform;
-@group(1) @binding(1) var<storage, read> styles: array<Style>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -134,23 +132,24 @@ fn fs_polyline(input: VertexOutput) -> @location(0) vec4f {
   return input.color;
 }
 
-// @vertex
-// fn vs_mask(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-//     var out: VertexOutput;
-//
-//     // 頂点インデックス（0〜3）に応じて、MVTのローカル座標（0〜4096）を動的に生成
-//     // Triangle Strip 用の配置 (左下、右下、左上、右上)
-//     var local_pos = vec2<f32>(0.0, 0.0);
-//     if (vertexIndex == 1u) { local_pos = vec2<f32>(4096.0, 0.0); }
-//     if (vertexIndex == 2u) { local_pos = vec2<f32>(0.0, 4096.0); }
-//     if (vertexIndex == 3u) { local_pos = vec2<f32>(4096.0, 4096.0); }
-//
-//     // タイルの位置に合わせて座標変換
-//     out.position = vec4f(transform.matrix * vec3<f32>(local_pos, 1.0), 1.0, 1.0);
-//     return out;
-// }
-//
-// @fragment
-// fn fs_dummy() -> @location(0) vec4<f32> {
-//     return vec4<f32>(0.0); // パイプライン側で writeMask: 0 にしているので、何を出力しても画面には塗られません
-// }
+@vertex
+fn vs_mask(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+    var out: VertexOutput;
+
+    // 頂点インデックス（0〜3）に応じて、MVTのローカル座標（0〜4096）を動的に生成
+    // Triangle Strip 用の配置 (左下、右下、左上、右上)
+    var local_pos = vec2<f32>(0.0, 0.0);
+    if (vertexIndex == 1u) { local_pos = vec2<f32>(4096.0, 0.0); }
+    if (vertexIndex == 2u) { local_pos = vec2<f32>(0.0, 4096.0); }
+    if (vertexIndex == 3u) { local_pos = vec2<f32>(4096.0, 4096.0); }
+
+    // タイルの位置に合わせて座標変換
+    out.position = vec4f(transform.matrix * vec3<f32>(local_pos, 1.0), 1.0, 1.0);
+    return out;
+}
+
+@fragment
+fn fs_dummy() -> @location(0) vec4<f32> {
+  return vec4<f32>(0.0);
+  // return vec4f(1.0, 0.0, 0.0, 0.5); // パイプライン側で writeMask: 0 にしているので、何を出力しても画面には塗られません
+}

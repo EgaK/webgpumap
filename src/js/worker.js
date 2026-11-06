@@ -101,6 +101,24 @@ async function init(viewArray) {
   // ==========================================
   const shaderModule = device.createShaderModule({ code: shaderCode });
 
+  const maskPipeline = makePipline(
+    device,
+    commonBindGroupLayout,
+    tileBindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_mask",
+    0,
+    [],
+    "triangle-strip",
+    "fs_dummy",
+    true,
+    {
+      compare: "always",
+      passOp: "replace",
+    },
+  );
+
   const polygonPipeline = makePipline(
     device,
     commonBindGroupLayout,
@@ -185,8 +203,6 @@ async function init(viewArray) {
     styleTable.push(...fillColor, opacity, ...lineColor, thickness);
   }
 
-  console.log("style", clampTable, styleTable, style);
-
   device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(clampTable));
   device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
 
@@ -217,9 +233,7 @@ async function init(viewArray) {
     const drawData = onCreateTile(device, tileBindGroupLayout, tileData, zxy);
     visibleTiles.push(drawData);
   }
-  console.log("tiles", visibleTiles);
 
-  // ユニフォームバッファを更新する関数を作成
   function updateCamera(zxy, buffer) {
     // Uniformにはzoom情報のみ
     device.queue.writeBuffer(
@@ -266,6 +280,9 @@ async function init(viewArray) {
         depthClearValue: 0.0,
         depthLoadOp: "clear",
         depthStoreOp: "store",
+        stencilClearValue: 0, // ステンシルの初期値
+        stencilLoadOp: "clear",
+        stencilStoreOp: "store",
       },
     });
 
@@ -273,7 +290,15 @@ async function init(viewArray) {
 
     for (const tile of visibleTiles) {
       updateCamera(tile.zxy, tile.transformBuffer);
+
+      renderPass.setPipeline(maskPipeline);
+      renderPass.setStencilReference(1); // マスク領域を「1」に設定
+
       renderPass.setBindGroup(1, tile.bindGroup);
+
+      // 頂点バッファなしで4頂点のTriangle Stripを描画
+      renderPass.draw(4, 1, 0, 0);
+
       //ポリゴン
       if (tile.polygonIndexCount > 0) {
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
@@ -301,6 +326,10 @@ async function init(viewArray) {
         renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
         renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
       }
+
+      renderPass.setPipeline(maskPipeline);
+      renderPass.setStencilReference(0);
+      renderPass.draw(4, 1, 0, 0);
     }
 
     renderPass.end();
@@ -314,43 +343,6 @@ async function init(viewArray) {
  * 2Dタイル用の3x2マトリックスを計算する関数
  * @returns {Float32Array} 3x2行列（列優先/Column-major, 要素数6）
  */
-function computeTileMatrix3x21(
-  tileZ,
-  tileX,
-  tileY,
-  tileExtent,
-  centerX,
-  centerY,
-  currentZoom,
-  width,
-  height,
-  tileSizePixels = 1024,
-) {
-  const totalWorldPixels = tileSizePixels * Math.pow(2, currentZoom);
-  const scaleX = (totalWorldPixels / width) * 2.0;
-  const scaleY = (totalWorldPixels / height) * 2.0;
-
-  const tileNum = Math.pow(2, tileZ);
-  const tileScale = 1.0 / tileNum;
-  const tileWorldX = tileX * tileScale;
-  const tileWorldY = tileY * tileScale;
-
-  // 1列目: X軸のスケール
-  const m00 = (tileScale / tileExtent) * scaleX;
-  const m01 = 0.0;
-
-  // 2列目: Y軸のスケール（MVTの特性に合わせて反転）
-  const m10 = 0.0;
-  const m11 = -(tileScale / tileExtent) * scaleY;
-
-  // 3列目: 平行移動量（中心座標からの差分）
-  const m20 = (tileWorldX - centerX) * scaleX;
-  const m21 = -(tileWorldY - centerY) * scaleY;
-
-  // WGSLの mat3x2<f32> に適合する配列（列優先：1列目、2列目、3列目の順）
-  return new Float32Array([m00, m01, m10, m11, m20, m21]);
-}
-
 function computeTileMatrix3x2(
   tileZ,
   tileX,
@@ -411,7 +403,7 @@ function updateCanvasSize(size) {
   msaaDepthTexture = device.createTexture({
     size: size,
     sampleCount: 4, // ★カラーと合わせる
-    format: "depth24plus",
+    format: "depth24plus-stencil8",
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
   });
 }
