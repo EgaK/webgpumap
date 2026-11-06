@@ -1,26 +1,8 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)feature_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)feature_id:i32,@location(2)pad:i32,@location(3)normal:vec2f,}struct Property{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct Style{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,pad0:f32,pad1:f32,pad2:f32,styles:array<Style,6>,}struct Transform{matrix:mat3x2f,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<uniform> transform:Transform;@group(1)@binding(1)var<storage,read>properties:array<Property>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.styles[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.feature_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.feature_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let prop=properties[input.feature_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-1){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.styles[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(input.normal);let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.feature_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.pos)>0&&length(input.normal)<0.5&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}`;
+var shader_default = `struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)style_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)style_id:i32,@location(2)pad:i32,@location(3)normal:vec2f,}struct Style{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct ClampTable{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,tile_opacity:f32,pad0:f32,pad1:f32,clamps:array<ClampTable,6>,padvec1:vec4f,styles:array<Style,12>}struct Transform{matrix:mat3x2f,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<uniform> transform:Transform;@group(1)@binding(1)var<storage,read>styles:array<Style>;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.clamps[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-5){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.clamps[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(input.normal);let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.style_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.normal)<0.5&&length(input.pos)>0&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}`;
 
 // src/js/onCreateTile.js
 function onCreateTile(device2, tileBindGroupLayout, tileData, zxy) {
-  let STRIDE = 32;
-  const propertyBufferSize = tileData.propStructs.length * STRIDE;
-  const propertyBuffer = device2.createBuffer({
-    size: propertyBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-  const propertyData = new Uint8Array(propertyBufferSize);
-  tileData.propStructs.forEach((cmd, i) => {
-    const offset = i * STRIDE;
-    const buf1 = new Float32Array([
-      ...cmd.fillColor,
-      cmd.opacity,
-      ...cmd.lineColor,
-      cmd.thickness
-    ]);
-    propertyData.set(new Uint8Array(buf1.buffer), offset);
-  });
-  device2.queue.writeBuffer(propertyBuffer, 0, propertyData);
   const polygonVertexBuffer = device2.createBuffer({
     size: tileData.polygonVertex.length * 16,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
@@ -39,7 +21,7 @@ function onCreateTile(device2, tileBindGroupLayout, tileData, zxy) {
   });
   const borderIndexData = new Uint32Array(tileData.borderIndex);
   device2.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
-  STRIDE = 32;
+  let STRIDE = 32;
   const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device2.createBuffer({
     size: lineVertexBufferSize,
@@ -48,7 +30,7 @@ function onCreateTile(device2, tileBindGroupLayout, tileData, zxy) {
   const lineVertexData = new Uint8Array(lineVertexBufferSize);
   tileData.lineVertex.forEach((vtx, i) => {
     const offset = i * STRIDE;
-    const buf1 = new Int32Array([...vtx.pos, vtx.featureID]);
+    const buf1 = new Int32Array([...vtx.pos, vtx.styleId]);
     const buf2 = new Float32Array(vtx.normal);
     lineVertexData.set(new Uint8Array(buf1.buffer), offset);
     lineVertexData.set(new Uint8Array(buf2.buffer), offset + 16);
@@ -81,10 +63,8 @@ function onCreateTile(device2, tileBindGroupLayout, tileData, zxy) {
     layout: tileBindGroupLayout,
     // グループ1の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: transformBuffer } },
+      { binding: 0, resource: { buffer: transformBuffer } }
       // 実体バッファ
-      { binding: 1, resource: { buffer: propertyBuffer } }
-      // タイル個別のバッファを紐付け
     ]
   });
   return {
@@ -1634,8 +1614,8 @@ var style_default = [
     Color: [0.39, 0.39, 0.39],
     //"100,100,100",
     // Color: '646464',
-    thickness: 2,
-    Dash: [20, 20]
+    thickness: 2
+    // Dash: [20, 20],
   },
   {
     // 水域
@@ -1723,7 +1703,6 @@ var style_default = [
 
 // src/js/loadTile.js
 var loadTile_default = async (zxy) => {
-  let propStructs = [];
   let polygonVertex = [];
   let polygonVertexBase = 0;
   let polygonIndex = [];
@@ -1749,7 +1728,6 @@ var loadTile_default = async (zxy) => {
     }
   }
   return {
-    propStructs,
     polygonVertex,
     polygonIndex,
     borderIndex,
@@ -1798,11 +1776,9 @@ var loadTile_default = async (zxy) => {
     return sum < 0;
   }
   function processMVTLayer(layer2, prop) {
+    var styleId = prop.ID;
     var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
-      var fillColor = prop.Color;
-      var opacity = prop.OPacity || 1;
-      var strokeColor = [0.3, 0.3, 0.3];
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
         if (feature.type !== 3) continue;
@@ -1813,13 +1789,7 @@ var loadTile_default = async (zxy) => {
           const formattedRing = ring.map((p) => [p.x, p.y]);
           if (isClockwise(formattedRing)) {
             if (currentPolygonRings.length > 0) {
-              addPolygon(
-                currentPolygonRings,
-                fillColor,
-                strokeColor,
-                strokeThickness,
-                opacity
-              );
+              addPolygon(currentPolygonRings, styleId, strokeThickness);
             }
             currentPolygonRings = [formattedRing];
           } else {
@@ -1827,18 +1797,10 @@ var loadTile_default = async (zxy) => {
           }
         }
         if (currentPolygonRings.length > 0) {
-          addPolygon(
-            currentPolygonRings,
-            fillColor,
-            strokeColor,
-            strokeThickness,
-            opacity
-          );
+          addPolygon(currentPolygonRings, styleId, strokeThickness);
         }
       }
     } else {
-      var strokeColor = prop.Color;
-      var opacity = prop.OPacity || 1;
       for (var i = 0; i < layer2.length; i++) {
         const feature = layer2.feature(i);
         if (feature.type !== 2) continue;
@@ -1847,31 +1809,25 @@ var loadTile_default = async (zxy) => {
           if (ring.length === 0) continue;
           const formattedRing = ring.map((p) => [p.x, p.y]);
           if (strokeThickness != 1) {
-            addPolyline(formattedRing, strokeColor, strokeThickness, opacity);
+            addPolyline(formattedRing, styleId);
           } else {
-            addThin(formattedRing, strokeColor, opacity);
+            addThin(formattedRing, styleId);
           }
         }
       }
     }
   }
-  function addThin(points, color, opacity) {
+  function addThin(points, styleId) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      thinVertex.push(...p, propStructs.length, 1);
+      thinVertex.push(...p, styleId, 1);
       if (i < points.length - 1) {
         thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
       }
     }
     thinIndexBase += points.length;
-    propStructs.push({
-      fillColor: [1, 1, 1],
-      lineColor: color,
-      opacity,
-      thickness: 1
-    });
   }
-  function addPolygon(rings, fillColor, lineColor, strokeThickness, opacity) {
+  function addPolygon(rings, styleId, strokeThickness) {
     const earcutRawData = [];
     const holeIndices = [];
     let currentVertexCount = 0;
@@ -1884,7 +1840,7 @@ var loadTile_default = async (zxy) => {
       for (let i2 = 0; i2 < ring.length; i2++) {
         const p = ring[i2];
         earcutRawData.push(p[0], p[1]);
-        polygonVertex.push(...p, propStructs.length, 1);
+        polygonVertex.push(...p, styleId, 1);
         currentVertexCount++;
         if (strokeThickness > 0) {
           borderIndex.push(
@@ -1900,42 +1856,35 @@ var loadTile_default = async (zxy) => {
     indices.forEach((idx) => {
       polygonIndex.push(polygonVertexBase + idx);
     });
-    propStructs.push({
-      fillColor,
-      lineColor,
-      opacity,
-      thickness: strokeThickness
-    });
     polygonVertexBase += currentVertexCount;
   }
-  function addPolyline(points, color, thickness, opacity) {
+  function addPolyline(points, styleId) {
     const numPoints = points.length;
     if (numPoints < 2) return;
     for (let i = 0; i < numPoints - 1; i++) {
       const current = points[i];
       const next = points[i + 1];
       const base = lineVertex.length;
-      const featureID = propStructs.length;
       const dx = next[0] - current[0];
       const dy = -next[1] + current[1];
       lineVertex.push({
         pos: current,
-        featureID,
+        styleId,
         normal: [dy, -dx]
       });
       lineVertex.push({
         pos: current,
-        featureID,
+        styleId,
         normal: [-dy, dx]
       });
       lineVertex.push({
         pos: next,
-        featureID,
+        styleId,
         normal: [-dy, dx]
       });
       lineVertex.push({
         pos: next,
-        featureID,
+        styleId,
         normal: [dy, -dx]
       });
       lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
@@ -1943,12 +1892,6 @@ var loadTile_default = async (zxy) => {
         lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
       }
     }
-    propStructs.push({
-      fillColor: [1, 1, 1],
-      lineColor: color,
-      opacity,
-      thickness
-    });
   }
 };
 
@@ -2082,7 +2025,8 @@ async function init(viewArray) {
     entries: [
       {
         binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX,
+        // | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }
         // Uniformバッファが入りますよという宣言
       }
@@ -2092,14 +2036,10 @@ async function init(viewArray) {
     entries: [
       {
         binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX,
+        // | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }
         // Uniformバッファが入りますよという宣言
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" }
       }
     ]
   });
@@ -2159,22 +2099,32 @@ async function init(viewArray) {
     }
   }
   uniformBuffer = device.createBuffer({
-    size: 128,
+    size: 512,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
+  let clampTable = [];
   let styleTable = [];
-  for (const s of style_default) {
+  for (let i = style_default.length; i--; ) {
+    const s = style_default[i];
     if (/p|s/.test(s.Type)) continue;
-    if (Array.isArray(s.thickness)) {
-      styleTable.push(...s.thickness.flat());
-      s.thickness = -(~~styleTable.length / 4);
+    s.ID = ~~(styleTable.length / 8);
+    let thickness = s.thickness || 1;
+    let opacity = s.OPacity || 1;
+    if (Array.isArray(thickness)) {
+      clampTable.push(...thickness.flat());
+      thickness = -(~~clampTable.length / 4);
     }
-    if (Array.isArray(s.OPacity)) {
-      styleTable.push(...s.OPacity.flat());
-      s.OPacity = -(~~styleTable.length / 4);
+    if (Array.isArray(opacity)) {
+      clampTable.push(...opacity.flat());
+      opacity = -(~~clampTable.length / 4);
     }
+    const fillColor = s.Type == "l" ? [1, 1, 1] : s.Color;
+    const lineColor = s.Type == "f" ? [0, 0, 0] : s.Color;
+    styleTable.push(...fillColor, opacity, ...lineColor, thickness);
   }
-  device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(styleTable));
+  console.log("style", clampTable, styleTable, style_default);
+  device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(clampTable));
+  device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
   const globalBindGroup = device.createBindGroup({
     layout: commonBindGroupLayout,
     // グループ0の設計図を指定
@@ -2186,7 +2136,9 @@ async function init(viewArray) {
   const visibleTiles = [];
   var zxys = [
     [15, 28191, 13180],
-    [15, 28192, 13180]
+    [15, 28192, 13180],
+    [15, 28191, 13179],
+    [15, 28192, 13179]
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);

@@ -79,7 +79,7 @@ async function init(viewArray) {
     entries: [
       {
         binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX, // | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
       },
     ],
@@ -90,13 +90,8 @@ async function init(viewArray) {
     entries: [
       {
         binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX, // | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" },
       },
     ],
   });
@@ -164,26 +159,36 @@ async function init(viewArray) {
   }
 
   uniformBuffer = device.createBuffer({
-    size: 128,
+    size: 512,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
+  let clampTable = [];
   let styleTable = [];
-  for (const s of style) {
+  // for (const s of style) {
+  for (let i = style.length; i--;) {
+    const s = style[i];
     if (/p|s/.test(s.Type)) continue;
-    if (Array.isArray(s.thickness)) {
-      styleTable.push(...s.thickness.flat());
-      s.thickness = -(~~styleTable.length / 4);
+    s.ID = ~~(styleTable.length / 8);
+    let thickness = s.thickness || 1;
+    let opacity = s.OPacity || 1;
+    if (Array.isArray(thickness)) {
+      clampTable.push(...thickness.flat());
+      thickness = -(~~clampTable.length / 4);
     }
-    if (Array.isArray(s.OPacity)) {
-      styleTable.push(...s.OPacity.flat());
-      s.OPacity = -(~~styleTable.length / 4);
+    if (Array.isArray(opacity)) {
+      clampTable.push(...opacity.flat());
+      opacity = -(~~clampTable.length / 4);
     }
+    const fillColor = s.Type == "l" ? [1, 1, 1] : s.Color;
+    const lineColor = s.Type == "f" ? [0, 0, 0] : s.Color;
+    styleTable.push(...fillColor, opacity, ...lineColor, thickness);
   }
 
-  // console.log("style", styleTable, style);
+  console.log("style", clampTable, styleTable, style);
 
-  device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(styleTable));
+  device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(clampTable));
+  device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
 
   // ==========================================
   // 3. 設計図（共通レイアウト）に、実際の一時バッファを紐付ける
@@ -203,6 +208,8 @@ async function init(viewArray) {
   var zxys = [
     [15, 28191, 13180],
     [15, 28192, 13180],
+    [15, 28191, 13179],
+    [15, 28192, 13179],
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile(zxy);
@@ -392,11 +399,6 @@ function computeTileMatrix3x2(
 }
 
 function updateCanvasSize(size) {
-  // device.queue.writeBuffer(
-  //   uniformBuffer,
-  //   80, // 後半の16バイトの位置から書き込み
-  //   new Float32Array(size),
-  // );
   // 1. MSAA用のカラーテクスチャ（4倍サンプリング）
   msaaColorTexture = device.createTexture({
     size: size,

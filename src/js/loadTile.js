@@ -6,7 +6,6 @@ import message from "./util/message";
 import style from "./style";
 
 export default async (zxy) => {
-  let propStructs = [];
   let polygonVertex = [];
   let polygonVertexBase = 0;
 
@@ -38,7 +37,6 @@ export default async (zxy) => {
     }
   }
   return {
-    propStructs,
     polygonVertex,
     polygonIndex,
     borderIndex,
@@ -92,11 +90,9 @@ export default async (zxy) => {
 
   // MVTレイヤーの全地物を処理するメインループ
   function processMVTLayer(layer, prop) {
+    var styleId = prop.ID;
     var strokeThickness = prop.thickness || 0;
     if (prop.Type == "f") {
-      var fillColor = prop.Color;
-      var opacity = prop.OPacity || 1.0;
-      var strokeColor = [0.3, 0.3, 0.3];
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
         // console.log("feature.type", feature.type, feature);
@@ -116,13 +112,7 @@ export default async (zxy) => {
           if (isClockwise(formattedRing)) {
             // 新しい外枠（時計回り）が来たら、それまでに溜まっていたポリゴンを処理
             if (currentPolygonRings.length > 0) {
-              addPolygon(
-                currentPolygonRings,
-                fillColor,
-                strokeColor,
-                strokeThickness,
-                opacity,
-              );
+              addPolygon(currentPolygonRings, styleId, strokeThickness);
             }
             // 新しいポリゴンとして初期化
             currentPolygonRings = [formattedRing];
@@ -134,18 +124,10 @@ export default async (zxy) => {
 
         // 最後のポリゴンを処理
         if (currentPolygonRings.length > 0) {
-          addPolygon(
-            currentPolygonRings,
-            fillColor,
-            strokeColor,
-            strokeThickness,
-            opacity,
-          );
+          addPolygon(currentPolygonRings, styleId, strokeThickness);
         }
       }
     } else {
-      var strokeColor = prop.Color;
-      var opacity = prop.OPacity || 1;
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
         // console.log("feature.type", feature.type, feature);
@@ -159,33 +141,27 @@ export default async (zxy) => {
           const formattedRing = ring.map((p) => [p.x, p.y]);
 
           if (strokeThickness != 1) {
-            addPolyline(formattedRing, strokeColor, strokeThickness, opacity);
+            addPolyline(formattedRing, styleId);
           } else {
-            addThin(formattedRing, strokeColor, opacity);
+            addThin(formattedRing, styleId);
           }
         }
       }
     }
   }
 
-  function addThin(points, color, opacity) {
+  function addThin(points, styleId) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      thinVertex.push(...p, propStructs.length, 1); //末尾の1はアライメントのパディング
+      thinVertex.push(...p, styleId, 1); //末尾の1はアライメントのパディング
       if (i < points.length - 1) {
         thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
       }
     }
     thinIndexBase += points.length;
-    propStructs.push({
-      fillColor: [1, 1, 1],
-      lineColor: color,
-      opacity,
-      thickness: 1,
-    });
   }
 
-  function addPolygon(rings, fillColor, lineColor, strokeThickness, opacity) {
+  function addPolygon(rings, styleId, strokeThickness) {
     // rings は [ outerLoop, innerHole1, innerHole2, ... ] という構造を想定
 
     const earcutRawData = []; // earcut用の一時的なフラット配列 [x1,y1, x2,y2, ...]
@@ -207,7 +183,7 @@ export default async (zxy) => {
         // earcut用
         earcutRawData.push(p[0], p[1]);
 
-        polygonVertex.push(...p, propStructs.length, 1);
+        polygonVertex.push(...p, styleId, 1);
         currentVertexCount++;
 
         // 枠線（折れ線）用の処理
@@ -231,18 +207,11 @@ export default async (zxy) => {
       polygonIndex.push(polygonVertexBase + idx);
     });
 
-    propStructs.push({
-      fillColor,
-      lineColor,
-      opacity,
-      thickness: strokeThickness,
-    });
-
     // グローバルなオフセットの更新
     polygonVertexBase += currentVertexCount;
   }
 
-  function addPolyline(points, color, thickness, opacity) {
+  function addPolyline(points, styleId) {
     const numPoints = points.length;
     if (numPoints < 2) return;
 
@@ -251,7 +220,6 @@ export default async (zxy) => {
       const next = points[i + 1];
       const base = lineVertex.length;
 
-      const featureID = propStructs.length;
       const dx = next[0] - current[0];
       // GPU側の座標に合わせて符号を反転しておく
       const dy = -next[1] + current[1];
@@ -259,22 +227,22 @@ export default async (zxy) => {
 
       lineVertex.push({
         pos: current,
-        featureID,
+        styleId,
         normal: [dy, -dx],
       });
       lineVertex.push({
         pos: current,
-        featureID,
+        styleId,
         normal: [-dy, dx],
       });
       lineVertex.push({
         pos: next,
-        featureID,
+        styleId,
         normal: [-dy, dx],
       });
       lineVertex.push({
         pos: next,
-        featureID,
+        styleId,
         normal: [dy, -dx],
       });
 
@@ -284,12 +252,5 @@ export default async (zxy) => {
         lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
       }
     }
-
-    propStructs.push({
-      fillColor: [1, 1, 1],
-      lineColor: color,
-      opacity,
-      thickness: thickness,
-    });
   }
 };

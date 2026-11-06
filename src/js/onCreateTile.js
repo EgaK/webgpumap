@@ -4,32 +4,6 @@ export default function onCreateTile(
   tileData,
   zxy,
 ) {
-  // そのタイル固有のpropertyBuffer（GPUバッファ）を作成・転送
-  let STRIDE = 32; // propStructs は1要素48バイト
-  const propertyBufferSize = tileData.propStructs.length * STRIDE;
-  const propertyBuffer = device.createBuffer({
-    size: propertyBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  const propertyData = new Uint8Array(propertyBufferSize);
-  tileData.propStructs.forEach((cmd, i) => {
-    const offset = i * STRIDE;
-    const buf1 = new Float32Array([
-      ...cmd.fillColor,
-      cmd.opacity,
-      ...cmd.lineColor,
-      cmd.thickness,
-    ]);
-    // const buf2 = new Uint32Array([
-    //   cmd.index_base,
-    //   cmd.index_count,
-    //   cmd.vertex_base,
-    // ]);
-    propertyData.set(new Uint8Array(buf1.buffer), offset);
-    // propertyData.set(new Uint8Array(buf2.buffer), offset + 36);
-  });
-  device.queue.writeBuffer(propertyBuffer, 0, propertyData);
-
   const polygonVertexBuffer = device.createBuffer({
     size: tileData.polygonVertex.length * 16,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -51,7 +25,7 @@ export default function onCreateTile(
   const borderIndexData = new Uint32Array(tileData.borderIndex);
   device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
 
-  STRIDE = 32;
+  let STRIDE = 32;
   const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device.createBuffer({
     size: lineVertexBufferSize,
@@ -60,7 +34,7 @@ export default function onCreateTile(
   const lineVertexData = new Uint8Array(lineVertexBufferSize);
   tileData.lineVertex.forEach((vtx, i) => {
     const offset = i * STRIDE;
-    const buf1 = new Int32Array([...vtx.pos, vtx.featureID]);
+    const buf1 = new Int32Array([...vtx.pos, vtx.styleId]);
     const buf2 = new Float32Array(vtx.normal);
 
     lineVertexData.set(new Uint8Array(buf1.buffer), offset);
@@ -99,7 +73,6 @@ export default function onCreateTile(
     layout: tileBindGroupLayout, // グループ1の設計図を指定
     entries: [
       { binding: 0, resource: { buffer: transformBuffer } }, // 実体バッファ
-      { binding: 1, resource: { buffer: propertyBuffer } }, // タイル個別のバッファを紐付け
     ],
   });
 
