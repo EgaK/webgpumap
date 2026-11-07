@@ -26,6 +26,7 @@ struct ClampTable {
 struct Uniforms {
   zoom: f32,
   // ズームイン・アウトでタイルが切り替わる際、新しいタイルが「パッ」と突然現れるとチカチカして見栄えが悪くなります。多くの地図アプリは、新しいタイルを 0.2 秒ほどかけてフワッとフェードインさせています。そのための変数tile_opacity
+  // これはタイル毎に設定すべきでは？
   tile_opacity: f32,
   pad0: f32, pad1: f32,
   clamps: array<ClampTable, 6>, // 16バイト目から96バイト

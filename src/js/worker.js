@@ -258,6 +258,7 @@ async function init(viewArray) {
   function render() {
     requestAnimationFrame(render);
     if (!viewArray[3]) return;
+    const start = performance.now();
     const commandEncoder = device.createCommandEncoder();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
@@ -287,53 +288,89 @@ async function init(viewArray) {
 
     renderPass.setBindGroup(0, globalBindGroup);
 
-    for (const tile of visibleTiles) {
+    renderPass.setPipeline(maskPipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
       updateCamera(tile.zxy, tile.transformBuffer);
 
-      renderPass.setPipeline(maskPipeline);
-      renderPass.setStencilReference(1); // マスク領域を「1」に設定
+      renderPass.setStencilReference(i + 1); // マスク領域を「1」に設定
 
       renderPass.setBindGroup(1, tile.bindGroup);
 
       // 頂点バッファなしで4頂点のTriangle Stripを描画
       renderPass.draw(4, 1, 0, 0);
+    }
 
-      //ポリゴン
+    //ポリゴン;
+    renderPass.setPipeline(polygonPipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
       if (tile.polygonIndexCount > 0) {
+        updateCamera(tile.zxy, tile.transformBuffer);
+        renderPass.setBindGroup(1, tile.bindGroup);
+
+        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setPipeline(polygonPipeline);
         renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
         renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       }
-      // ボーダー
+    }
+
+    // ボーダー
+    renderPass.setPipeline(thinLinePipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
       if (tile.borderIndexCount > 0) {
-        renderPass.setPipeline(thinLinePipeline);
+        updateCamera(tile.zxy, tile.transformBuffer);
+        renderPass.setBindGroup(1, tile.bindGroup);
+        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
+        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
         renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
         renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       }
-      // ポリライン;
+    }
+
+    // ポリライン;
+    renderPass.setPipeline(linePipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
       if (tile.lineIndexCount > 0) {
+        updateCamera(tile.zxy, tile.transformBuffer);
+        renderPass.setBindGroup(1, tile.bindGroup);
+        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-        renderPass.setPipeline(linePipeline);
         renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
         renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       }
-      // 細いポリライン
+    }
+
+    // 細いポリライン
+    renderPass.setPipeline(thinLinePipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
       if (tile.thinIndexCount > 0) {
+        updateCamera(tile.zxy, tile.transformBuffer);
+        renderPass.setBindGroup(1, tile.bindGroup);
+        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-        renderPass.setPipeline(thinLinePipeline);
         renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
         renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
       }
-
-      renderPass.setPipeline(maskPipeline);
-      renderPass.setStencilReference(0);
-      renderPass.draw(4, 1, 0, 0);
     }
+
+    // renderPass.setPipeline(maskPipeline);
+    // for (let i = 0; i < visibleTiles.length; i++) {
+    //   const tile = visibleTiles[i];
+    //   renderPass.setBindGroup(1, tile.bindGroup);
+    //   renderPass.setPipeline(maskPipeline);
+    //   renderPass.setStencilReference(0);
+    //   renderPass.draw(4, 1, 0, 0);
+    // }
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
     viewArray[3] = 0;
+    message("t", performance.now() - start);
   }
   render();
 }
