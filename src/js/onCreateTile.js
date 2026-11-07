@@ -1,6 +1,6 @@
 export default function onCreateTile(
   device,
-  tileBindGroupLayout,
+  // tileBindGroupLayout,
   tileData,
   zxy,
 ) {
@@ -69,16 +69,16 @@ export default function onCreateTile(
   });
 
   // そのタイル固有のBindGroup（グループ1の実体）を作成
-  const bindGroup = device.createBindGroup({
-    layout: tileBindGroupLayout, // グループ1の設計図を指定
-    entries: [
-      { binding: 0, resource: { buffer: transformBuffer } }, // 実体バッファ
-    ],
-  });
+  // const bindGroup = device.createBindGroup({
+  //   layout: tileBindGroupLayout, // グループ1の設計図を指定
+  //   entries: [
+  //     { binding: 0, resource: { buffer: transformBuffer } }, // 実体バッファ
+  //   ],
+  // });
 
   return {
     zxy,
-    bindGroup,
+    // bindGroup,
     transformBuffer,
     polygonVertexBuffer,
     polygonIndexBuffer,

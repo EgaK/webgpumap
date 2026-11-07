@@ -25,10 +25,7 @@ struct ClampTable {
 
 struct Uniforms {
   zoom: f32,
-  // ズームイン・アウトでタイルが切り替わる際、新しいタイルが「パッ」と突然現れるとチカチカして見栄えが悪くなります。多くの地図アプリは、新しいタイルを 0.2 秒ほどかけてフワッとフェードインさせています。そのための変数tile_opacity
-  // これはタイル毎に設定すべきでは？
-  tile_opacity: f32,
-  pad0: f32, pad1: f32,
+  pad0: f32, pad1: f32, pad2: f32,
   clamps: array<ClampTable, 6>, // 16バイト目から96バイト
   padvec1: vec4f,
   styles: array<Style, 12>  // 128バイト目から
@@ -36,10 +33,12 @@ struct Uniforms {
 
 struct Transform {
   matrix: mat3x2f, // 24バイト (3列 × vec2f)
+  // ズームイン・アウトでタイルが切り替わる際、新しいタイルが「パッ」と突然現れるとチカチカして見栄えが悪くなります。多くの地図アプリは、新しいタイルを 0.2 秒ほどかけてフワッとフェードインさせています。そのための変数tile_opacity
+  tile_opacity: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(1) @binding(0) var<uniform> transform: Transform;
+@group(0) @binding(1) var<uniform> transform: Transform;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,

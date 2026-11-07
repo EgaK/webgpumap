@@ -8,7 +8,12 @@ import makePipline from "./makePipline";
 import message from "./util/message";
 import { baseTile } from "./util/constants";
 
-var canvas, size, device, uniformBuffer, msaaColorTexture, msaaDepthTexture;
+var canvas,
+  size,
+  device,
+  styleUniformBuffer,
+  msaaColorTexture,
+  msaaDepthTexture;
 
 const { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
 
@@ -75,23 +80,17 @@ async function init(viewArray) {
   // ==========================================
 
   // グループ0（画面共通Uniform用）の設計図
-  const commonBindGroupLayout = device.createBindGroupLayout({
+  const bindGroupLayout = device.createBindGroupLayout({
     entries: [
       {
         binding: 0,
         visibility: GPUShaderStage.VERTEX, // | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
       },
-    ],
-  });
-
-  // グループ1（タイル固有のpropertyBuffer用）の設計図
-  const tileBindGroupLayout = device.createBindGroupLayout({
-    entries: [
       {
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX, // | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform" }, // Uniformバッファが入りますよという宣言
+        binding: 1, // タイル毎の行列（動的）
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "uniform", hasDynamicOffset: true }, // 動的オフセットあり！
       },
     ],
   });
@@ -103,8 +102,7 @@ async function init(viewArray) {
 
   const maskPipeline = makePipline(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_mask",
@@ -121,8 +119,7 @@ async function init(viewArray) {
 
   const polygonPipeline = makePipline(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_polygon",
@@ -136,8 +133,7 @@ async function init(viewArray) {
 
   const thinLinePipeline = makePipline(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_thinline",
@@ -151,8 +147,7 @@ async function init(viewArray) {
 
   const linePipeline = makePipline(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_polyline",
@@ -176,8 +171,12 @@ async function init(viewArray) {
     }
   }
 
-  uniformBuffer = device.createBuffer({
+  styleUniformBuffer = device.createBuffer({
     size: 512,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  const megaMatrixBuffer = device.createBuffer({
+    size: 50 * 256,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
@@ -203,17 +202,26 @@ async function init(viewArray) {
     styleTable.push(...fillColor, opacity, ...lineColor, thickness);
   }
 
-  device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(clampTable));
-  device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
+  device.queue.writeBuffer(
+    styleUniformBuffer,
+    16,
+    new Float32Array(clampTable),
+  );
+  device.queue.writeBuffer(
+    styleUniformBuffer,
+    128,
+    new Float32Array(styleTable),
+  );
 
   // ==========================================
   // 3. 設計図（共通レイアウト）に、実際の一時バッファを紐付ける
   // ==========================================
   // 画面全体で1つだけ使い回す実体（BindGroup）
   const globalBindGroup = device.createBindGroup({
-    layout: commonBindGroupLayout, // グループ0の設計図を指定
+    layout: bindGroupLayout, // グループ0の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } }, // 実体バッファ
+      { binding: 0, resource: { buffer: styleUniformBuffer } }, // 実体バッファ
+      { binding: 1, resource: { buffer: megaMatrixBuffer, size: 32 } }, // 1回に読むのは32バイト
     ],
   });
 
@@ -229,28 +237,28 @@ async function init(viewArray) {
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile(zxy);
-    const drawData = onCreateTile(device, tileBindGroupLayout, tileData, zxy);
+    const drawData = onCreateTile(device, tileData, zxy);
     visibleTiles.push(drawData);
   }
 
-  function updateCamera(zxy, buffer) {
-    // Uniformにはzoom情報のみ
-    device.queue.writeBuffer(
-      uniformBuffer,
-      0,
-      new Float32Array([viewArray[2]]),
-    );
-
-    const matrix = computeTileMatrix3x2(
-      ...zxy,
-      4096,
-      viewArray[0],
-      viewArray[1],
-      viewArray[2],
-      ...size,
-    );
-    device.queue.writeBuffer(buffer, 0, matrix);
-  }
+  //   function updateCamera(zxy, buffer) {
+  //     // Uniformにはzoom情報のみ
+  //     device.queue.writeBuffer(
+  //       styleUniformBuffer,
+  //       0,
+  //       new Float32Array([viewArray[2]]),
+  //     );
+  //
+  //     const matrix = computeTileMatrix3x2(
+  //       ...zxy,
+  //       4096,
+  //       viewArray[0],
+  //       viewArray[1],
+  //       viewArray[2],
+  //       ...size,
+  //     );
+  //     device.queue.writeBuffer(buffer, 0, matrix);
+  //   }
 
   // updateCamera(zxys[0]);
   updateCanvasSize(size);
@@ -286,28 +294,49 @@ async function init(viewArray) {
       },
     });
 
-    renderPass.setBindGroup(0, globalBindGroup);
+    //ズーム値を書き込む
+    device.queue.writeBuffer(
+      styleUniformBuffer,
+      0,
+      new Float32Array([viewArray[2]]),
+    );
 
+    // 全タイルの変換行列を書き込む
+    // 256バイト = f32の64個分
+    const matrixUploadData = new Float32Array(visibleTiles.length * 64);
     renderPass.setPipeline(maskPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
-      updateCamera(tile.zxy, tile.transformBuffer);
+      const matrix = computeTileMatrix3x2(
+        ...tile.zxy,
+        4096,
+        viewArray[0],
+        viewArray[1],
+        viewArray[2],
+        ...size,
+      );
+      const offsetInFloat32 = i * 64;
+      matrixUploadData.set(matrix, offsetInFloat32);
+    }
+    //  まとめて 1回の writeBuffer で GPU へ一括転送！
+    device.queue.writeBuffer(megaMatrixBuffer, 0, matrixUploadData);
 
+    //ステンシルマスク
+    renderPass.setPipeline(maskPipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const dynamicOffset = i * 256;
+      renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
       renderPass.setStencilReference(i + 1); // マスク領域を「1」に設定
-
-      renderPass.setBindGroup(1, tile.bindGroup);
-
       // 頂点バッファなしで4頂点のTriangle Stripを描画
       renderPass.draw(4, 1, 0, 0);
     }
-
     //ポリゴン;
     renderPass.setPipeline(polygonPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.polygonIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
 
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
@@ -321,8 +350,8 @@ async function init(viewArray) {
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.borderIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
         renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
@@ -335,8 +364,8 @@ async function init(viewArray) {
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.lineIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
         renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
@@ -349,23 +378,14 @@ async function init(viewArray) {
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.thinIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
         renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
         renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
       }
     }
-
-    // renderPass.setPipeline(maskPipeline);
-    // for (let i = 0; i < visibleTiles.length; i++) {
-    //   const tile = visibleTiles[i];
-    //   renderPass.setBindGroup(1, tile.bindGroup);
-    //   renderPass.setPipeline(maskPipeline);
-    //   renderPass.setStencilReference(0);
-    //   renderPass.draw(4, 1, 0, 0);
-    // }
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);

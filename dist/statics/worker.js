@@ -1,8 +1,8 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)style_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)style_id:i32,@location(2)pad:i32,@location(3)normal:vec2f,}struct Style{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct ClampTable{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,tile_opacity:f32,pad0:f32,pad1:f32,clamps:array<ClampTable,6>,padvec1:vec4f,styles:array<Style,12>}struct Transform{matrix:mat3x2f,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(1)@binding(0)var<uniform> transform:Transform;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.clamps[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-5){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.clamps[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(input.normal);let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.style_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.normal)<0.5&&length(input.pos)>0&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}@vertex fn vs_mask(@builtin(vertex_index)vertexIndex:u32)->VertexOutput{var out:VertexOutput;var local_pos=vec2<f32>(0.0,0.0);if(vertexIndex==1u){local_pos=vec2<f32>(4096.0,0.0);}if(vertexIndex==2u){local_pos=vec2<f32>(0.0,4096.0);}if(vertexIndex==3u){local_pos=vec2<f32>(4096.0,4096.0);}out.position=vec4f(transform.matrix*vec3<f32>(local_pos,1.0),1.0,1.0);return out;}@fragment fn fs_dummy()->@location(0)vec4<f32>{return vec4<f32>(0.0);}`;
+var shader_default = `struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)style_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)style_id:i32,@location(2)pad:i32,@location(3)normal:vec2f,}struct Style{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct ClampTable{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,pad0:f32,pad1:f32,pad2:f32,clamps:array<ClampTable,6>,padvec1:vec4f,styles:array<Style,12>}struct Transform{matrix:mat3x2f,tile_opacity:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<uniform> transform:Transform;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.clamps[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-5){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.clamps[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(input.normal);let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.style_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.normal)<0.5&&length(input.pos)>0&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}@vertex fn vs_mask(@builtin(vertex_index)vertexIndex:u32)->VertexOutput{var out:VertexOutput;var local_pos=vec2<f32>(0.0,0.0);if(vertexIndex==1u){local_pos=vec2<f32>(4096.0,0.0);}if(vertexIndex==2u){local_pos=vec2<f32>(0.0,4096.0);}if(vertexIndex==3u){local_pos=vec2<f32>(4096.0,4096.0);}out.position=vec4f(transform.matrix*vec3<f32>(local_pos,1.0),1.0,1.0);return out;}@fragment fn fs_dummy()->@location(0)vec4<f32>{return vec4<f32>(0.0);}`;
 
 // src/js/onCreateTile.js
-function onCreateTile(device2, tileBindGroupLayout, tileData, zxy) {
+function onCreateTile(device2, tileData, zxy) {
   const polygonVertexBuffer = device2.createBuffer({
     size: tileData.polygonVertex.length * 16,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
@@ -59,17 +59,9 @@ function onCreateTile(device2, tileBindGroupLayout, tileData, zxy) {
     // mat3x2 のサイズ
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
-  const bindGroup = device2.createBindGroup({
-    layout: tileBindGroupLayout,
-    // グループ1の設計図を指定
-    entries: [
-      { binding: 0, resource: { buffer: transformBuffer } }
-      // 実体バッファ
-    ]
-  });
   return {
     zxy,
-    bindGroup,
+    // bindGroup,
     transformBuffer,
     polygonVertexBuffer,
     polygonIndexBuffer,
@@ -1907,7 +1899,7 @@ var baseTile = {
 var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
 
 // src/js/makePipline.js
-var makePipline_default = (device2, commonBindGroupLayout, tileBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, arrayStride, attributes, topology, fEntryPoint = "fs_main", isMask, stencil = {
+var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, arrayStride, attributes, topology, fEntryPoint = "fs_main", isMask, stencil = {
   compare: "equal",
   // ステンシル値が一致する場合のみ描画
   passOp: "keep",
@@ -1918,7 +1910,7 @@ var makePipline_default = (device2, commonBindGroupLayout, tileBindGroupLayout, 
   const obj = {
     // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device2.createPipelineLayout({
-      bindGroupLayouts: [commonBindGroupLayout, tileBindGroupLayout]
+      bindGroupLayouts: [commonBindGroupLayout]
     }),
     vertex: {
       module: shaderModule,
@@ -1982,7 +1974,7 @@ var makePipline_default = (device2, commonBindGroupLayout, tileBindGroupLayout, 
 var canvas;
 var size;
 var device;
-var uniformBuffer;
+var styleUniformBuffer;
 var msaaColorTexture;
 var msaaDepthTexture;
 var { baseTileZ: baseTileZ2, baseTileX: baseTileX2, baseTileY: baseTileY2, tileSizePixels: tileSizePixels2 } = baseTile;
@@ -2033,7 +2025,7 @@ async function init(viewArray) {
     // alphaMode: "opaque",
     alphaMode: "premultiplied"
   });
-  const commonBindGroupLayout = device.createBindGroupLayout({
+  const bindGroupLayout = device.createBindGroupLayout({
     entries: [
       {
         binding: 0,
@@ -2041,25 +2033,20 @@ async function init(viewArray) {
         // | GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" }
         // Uniformバッファが入りますよという宣言
-      }
-    ]
-  });
-  const tileBindGroupLayout = device.createBindGroupLayout({
-    entries: [
+      },
       {
-        binding: 0,
+        binding: 1,
+        // タイル毎の行列（動的）
         visibility: GPUShaderStage.VERTEX,
-        // | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform" }
-        // Uniformバッファが入りますよという宣言
+        buffer: { type: "uniform", hasDynamicOffset: true }
+        // 動的オフセットあり！
       }
     ]
   });
   const shaderModule = device.createShaderModule({ code: shader_default });
   const maskPipeline = makePipline_default(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_mask",
@@ -2075,8 +2062,7 @@ async function init(viewArray) {
   );
   const polygonPipeline = makePipline_default(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_polygon",
@@ -2089,8 +2075,7 @@ async function init(viewArray) {
   );
   const thinLinePipeline = makePipline_default(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_thinline",
@@ -2103,8 +2088,7 @@ async function init(viewArray) {
   );
   const linePipeline = makePipline_default(
     device,
-    commonBindGroupLayout,
-    tileBindGroupLayout,
+    bindGroupLayout,
     presentationFormat,
     shaderModule,
     "vs_polyline",
@@ -2127,8 +2111,12 @@ async function init(viewArray) {
       );
     }
   }
-  uniformBuffer = device.createBuffer({
+  styleUniformBuffer = device.createBuffer({
     size: 512,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+  });
+  const megaMatrixBuffer = device.createBuffer({
+    size: 50 * 256,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
   let clampTable = [];
@@ -2151,14 +2139,24 @@ async function init(viewArray) {
     const lineColor = s.Type == "f" ? [0, 0, 0] : s.Color;
     styleTable.push(...fillColor, opacity, ...lineColor, thickness);
   }
-  device.queue.writeBuffer(uniformBuffer, 16, new Float32Array(clampTable));
-  device.queue.writeBuffer(uniformBuffer, 128, new Float32Array(styleTable));
+  device.queue.writeBuffer(
+    styleUniformBuffer,
+    16,
+    new Float32Array(clampTable)
+  );
+  device.queue.writeBuffer(
+    styleUniformBuffer,
+    128,
+    new Float32Array(styleTable)
+  );
   const globalBindGroup = device.createBindGroup({
-    layout: commonBindGroupLayout,
+    layout: bindGroupLayout,
     // グループ0の設計図を指定
     entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } }
+      { binding: 0, resource: { buffer: styleUniformBuffer } },
       // 実体バッファ
+      { binding: 1, resource: { buffer: megaMatrixBuffer, size: 32 } }
+      // 1回に読むのは32バイト
     ]
   });
   const visibleTiles = [];
@@ -2170,24 +2168,8 @@ async function init(viewArray) {
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);
-    const drawData = onCreateTile(device, tileBindGroupLayout, tileData, zxy);
+    const drawData = onCreateTile(device, tileData, zxy);
     visibleTiles.push(drawData);
-  }
-  function updateCamera(zxy, buffer) {
-    device.queue.writeBuffer(
-      uniformBuffer,
-      0,
-      new Float32Array([viewArray[2]])
-    );
-    const matrix = computeTileMatrix3x2(
-      ...zxy,
-      4096,
-      viewArray[0],
-      viewArray[1],
-      viewArray[2],
-      ...size
-    );
-    device.queue.writeBuffer(buffer, 0, matrix);
   }
   updateCanvasSize(size);
   function render() {
@@ -2221,21 +2203,40 @@ async function init(viewArray) {
         stencilStoreOp: "store"
       }
     });
-    renderPass.setBindGroup(0, globalBindGroup);
+    device.queue.writeBuffer(
+      styleUniformBuffer,
+      0,
+      new Float32Array([viewArray[2]])
+    );
+    const matrixUploadData = new Float32Array(visibleTiles.length * 64);
     renderPass.setPipeline(maskPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
-      updateCamera(tile.zxy, tile.transformBuffer);
+      const matrix = computeTileMatrix3x2(
+        ...tile.zxy,
+        4096,
+        viewArray[0],
+        viewArray[1],
+        viewArray[2],
+        ...size
+      );
+      const offsetInFloat32 = i * 64;
+      matrixUploadData.set(matrix, offsetInFloat32);
+    }
+    device.queue.writeBuffer(megaMatrixBuffer, 0, matrixUploadData);
+    renderPass.setPipeline(maskPipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const dynamicOffset = i * 256;
+      renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
       renderPass.setStencilReference(i + 1);
-      renderPass.setBindGroup(1, tile.bindGroup);
       renderPass.draw(4, 1, 0, 0);
     }
     renderPass.setPipeline(polygonPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.polygonIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
         renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
@@ -2246,8 +2247,8 @@ async function init(viewArray) {
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.borderIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
         renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
@@ -2258,8 +2259,8 @@ async function init(viewArray) {
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.lineIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
         renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
@@ -2270,8 +2271,8 @@ async function init(viewArray) {
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
       if (tile.thinIndexCount > 0) {
-        updateCamera(tile.zxy, tile.transformBuffer);
-        renderPass.setBindGroup(1, tile.bindGroup);
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
         renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
