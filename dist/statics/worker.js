@@ -3,70 +3,88 @@ var shader_default = `struct Vertex{@location(0)pos:vec2i,@location(1)style_id:i
 
 // src/js/onCreateTile.js
 function onCreateTile(device2, tileData, zxy) {
-  const prepareIndexData = (data) => {
+  const prepareData = (data) => {
     if (data.length % 2 != 0) {
       const last = data[data.length - 1];
       data.push(last);
     }
   };
-  const polygonVertexBuffer = device2.createBuffer({
-    size: tileData.polygonVertex.length * 2,
+  console.log(
+    "vertex:",
+    Math.ceil(
+      2 * (tileData.polygonVertex.length + tileData.lineVertex.length + tileData.thinVertex.length) / 1024
+    ),
+    "index:",
+    Math.ceil(
+      2 * (tileData.polygonIndex.length + tileData.borderIndex.length + tileData.lineIndex.length + tileData.thinIndex.length) / 1024
+    )
+  );
+  const PAGE_VERTEX_SIZE = 512 * 1024;
+  const PAGE_INDEX_SIZE = 256 * 1024;
+  const vertexBuffer = device2.createBuffer({
+    size: PAGE_VERTEX_SIZE,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
-  const polygonVertexData = new Int16Array(tileData.polygonVertex);
-  device2.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
-  prepareIndexData(tileData.polygonIndex);
-  const polygonIndexBuffer = device2.createBuffer({
-    size: tileData.polygonIndex.length * 2,
+  const indexBuffer = device2.createBuffer({
+    size: PAGE_INDEX_SIZE,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
-  const polygonIndexData = new Uint16Array(tileData.polygonIndex);
-  device2.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
-  prepareIndexData(tileData.borderIndex);
-  const borderIndexBuffer = device2.createBuffer({
-    size: tileData.borderIndex.length * 2,
-    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-  });
-  const borderIndexData = new Uint16Array(tileData.borderIndex);
-  device2.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
-  const lineVertexBuffer = device2.createBuffer({
-    size: tileData.lineVertex.length * 2,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-  });
-  const lineVertexData = new Uint16Array(tileData.lineVertex);
-  device2.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
-  prepareIndexData(tileData.lineIndex);
-  const lineIndexBuffer = device2.createBuffer({
-    size: tileData.lineIndex.length * 2,
-    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-  });
-  const lineIndexData = new Uint16Array(tileData.lineIndex);
-  device2.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
-  const thinVertexBuffer = device2.createBuffer({
-    size: tileData.thinVertex.length * 2,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-  });
-  const thinVertexData = new Int16Array(tileData.thinVertex);
-  device2.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
-  prepareIndexData(tileData.thinIndex);
-  const thinIndexBuffer = device2.createBuffer({
-    size: tileData.thinIndex.length * 2,
-    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-  });
-  const thinIndexData = new Uint16Array(tileData.thinIndex);
-  device2.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
+  device2.queue.writeBuffer(
+    vertexBuffer,
+    0,
+    new Int16Array(tileData.polygonVertex)
+  );
+  prepareData(tileData.polygonIndex);
+  device2.queue.writeBuffer(
+    indexBuffer,
+    0,
+    new Uint16Array(tileData.polygonIndex)
+  );
+  prepareData(tileData.borderIndex);
+  const borderIndexOffset = tileData.polygonIndex.length * 2;
+  device2.queue.writeBuffer(
+    indexBuffer,
+    borderIndexOffset,
+    new Uint16Array(tileData.borderIndex)
+  );
+  const lineVertexOffset = tileData.polygonVertex.length * 2;
+  device2.queue.writeBuffer(
+    vertexBuffer,
+    lineVertexOffset,
+    new Int16Array(tileData.lineVertex)
+  );
+  prepareData(tileData.lineIndex);
+  const lineIndexOffset = borderIndexOffset + tileData.borderIndex.length * 2;
+  device2.queue.writeBuffer(
+    indexBuffer,
+    lineIndexOffset,
+    new Uint16Array(tileData.lineIndex)
+  );
+  const thinVertexOffset = lineVertexOffset + tileData.lineVertex.length * 2;
+  device2.queue.writeBuffer(
+    vertexBuffer,
+    thinVertexOffset,
+    new Int16Array(tileData.thinVertex)
+  );
+  prepareData(tileData.thinIndex);
+  const thinIndexOffset = lineIndexOffset + tileData.lineIndex.length * 2;
+  device2.queue.writeBuffer(
+    indexBuffer,
+    thinIndexOffset,
+    new Uint16Array(tileData.thinIndex)
+  );
   return {
     zxy,
-    polygonVertexBuffer,
-    polygonIndexBuffer,
+    vertexBuffer,
+    indexBuffer,
+    lineVertexOffset,
+    thinVertexOffset,
+    borderIndexOffset,
+    lineIndexOffset,
+    thinIndexOffset,
     polygonIndexCount: tileData.polygonIndex.length,
-    borderIndexBuffer,
     borderIndexCount: tileData.borderIndex.length,
-    lineVertexBuffer,
-    lineIndexBuffer,
     lineIndexCount: tileData.lineIndex.length,
-    thinVertexBuffer,
-    thinIndexBuffer,
     thinIndexCount: tileData.thinIndex.length
   };
 }
@@ -2128,7 +2146,6 @@ async function init(viewArray) {
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);
-    console.log("tiledata:", tileData);
     const drawData = onCreateTile(device, tileData, zxy);
     visibleTiles.push(drawData);
   }
@@ -2199,8 +2216,8 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer);
+        renderPass.setIndexBuffer(tile.indexBuffer, "uint16");
         renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       }
     }
@@ -2211,8 +2228,12 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer);
+        renderPass.setIndexBuffer(
+          tile.indexBuffer,
+          "uint16",
+          tile.borderIndexOffset
+        );
         renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       }
     }
@@ -2223,8 +2244,12 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.lineVertexOffset);
+        renderPass.setIndexBuffer(
+          tile.indexBuffer,
+          "uint16",
+          tile.lineIndexOffset
+        );
         renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       }
     }
@@ -2235,8 +2260,12 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.thinVertexOffset);
+        renderPass.setIndexBuffer(
+          tile.indexBuffer,
+          "uint16",
+          tile.thinIndexOffset
+        );
         renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
       }
     }

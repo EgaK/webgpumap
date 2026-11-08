@@ -218,7 +218,7 @@ async function init(viewArray) {
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile(zxy);
-    console.log("tiledata:", tileData);
+    // console.log("tiledata:", tileData);
     const drawData = onCreateTile(device, tileData, zxy);
     visibleTiles.push(drawData);
   }
@@ -300,8 +300,8 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer);
+        renderPass.setIndexBuffer(tile.indexBuffer, "uint16");
         renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       }
     }
@@ -314,8 +314,12 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer);
+        renderPass.setIndexBuffer(
+          tile.indexBuffer,
+          "uint16",
+          tile.borderIndexOffset,
+        );
         renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       }
     }
@@ -328,8 +332,12 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.lineVertexOffset);
+        renderPass.setIndexBuffer(
+          tile.indexBuffer,
+          "uint16",
+          tile.lineIndexOffset,
+        );
         renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       }
     }
@@ -342,8 +350,12 @@ async function init(viewArray) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint16");
+        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.thinVertexOffset);
+        renderPass.setIndexBuffer(
+          tile.indexBuffer,
+          "uint16",
+          tile.thinIndexOffset,
+        );
         renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
       }
     }
