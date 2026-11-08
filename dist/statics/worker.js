@@ -1,68 +1,62 @@
 // src/js/shader.wgsl
-var shader_default = `struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)style_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)style_id:i32,@location(2)pad:i32,@location(3)normal:vec2f,}struct Style{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct ClampTable{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,pad0:f32,pad1:f32,pad2:f32,clamps:array<ClampTable,6>,padvec1:vec4f,styles:array<Style,12>}struct Transform{matrix:mat3x2f,tile_opacity:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<uniform> transform:Transform;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.clamps[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-5){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.clamps[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(input.normal);let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.style_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.normal)<0.5&&length(input.pos)>0&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}@vertex fn vs_mask(@builtin(vertex_index)vertexIndex:u32)->VertexOutput{var out:VertexOutput;var local_pos=vec2<f32>(0.0,0.0);if(vertexIndex==1u){local_pos=vec2<f32>(4096.0,0.0);}if(vertexIndex==2u){local_pos=vec2<f32>(0.0,4096.0);}if(vertexIndex==3u){local_pos=vec2<f32>(4096.0,4096.0);}out.position=vec4f(transform.matrix*vec3<f32>(local_pos,1.0),1.0,1.0);return out;}@fragment fn fs_dummy()->@location(0)vec4<f32>{return vec4<f32>(0.0);}`;
+var shader_default = `struct Vertex{@location(0)pos:vec2i,@location(1)style_id:i32,@location(2)normal:vec2i,}struct Style{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct ClampTable{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,pad0:f32,pad1:f32,pad2:f32,clamps:array<ClampTable,6>,padvec1:vec4f,styles:array<Style,12>}struct Transform{matrix:mat3x2f,tile_opacity:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<uniform> transform:Transform;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.clamps[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:Vertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:Vertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:Vertex,)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-5){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.clamps[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(vec2f(input.normal));let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.style_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.normal)<0.5&&length(input.pos)>0&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}@vertex fn vs_mask(@builtin(vertex_index)vertexIndex:u32)->VertexOutput{var out:VertexOutput;var local_pos=vec2<f32>(0.0,0.0);if(vertexIndex==1u){local_pos=vec2<f32>(4096.0,0.0);}if(vertexIndex==2u){local_pos=vec2<f32>(0.0,4096.0);}if(vertexIndex==3u){local_pos=vec2<f32>(4096.0,4096.0);}out.position=vec4f(transform.matrix*vec3<f32>(local_pos,1.0),1.0,1.0);return out;}@fragment fn fs_dummy()->@location(0)vec4<f32>{return vec4<f32>(0.0);}`;
 
 // src/js/onCreateTile.js
 function onCreateTile(device2, tileData, zxy) {
+  const prepareIndexData = (data) => {
+    if (data.length % 2 != 0) {
+      const last = data[data.length - 1];
+      data.push(last);
+    }
+  };
   const polygonVertexBuffer = device2.createBuffer({
-    size: tileData.polygonVertex.length * 16,
+    size: tileData.polygonVertex.length * 2,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
-  const polygonVertexData = new Int32Array(tileData.polygonVertex);
+  const polygonVertexData = new Int16Array(tileData.polygonVertex);
   device2.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
+  prepareIndexData(tileData.polygonIndex);
   const polygonIndexBuffer = device2.createBuffer({
-    size: tileData.polygonIndex.length * 4,
+    size: tileData.polygonIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
-  const polygonIndexData = new Uint32Array(tileData.polygonIndex);
+  const polygonIndexData = new Uint16Array(tileData.polygonIndex);
   device2.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
+  prepareIndexData(tileData.borderIndex);
   const borderIndexBuffer = device2.createBuffer({
-    size: tileData.borderIndex.length * 4,
+    size: tileData.borderIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
-  const borderIndexData = new Uint32Array(tileData.borderIndex);
+  const borderIndexData = new Uint16Array(tileData.borderIndex);
   device2.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
-  let STRIDE = 32;
-  const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device2.createBuffer({
-    size: lineVertexBufferSize,
+    size: tileData.lineVertex.length * 2,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
-  const lineVertexData = new Uint8Array(lineVertexBufferSize);
-  tileData.lineVertex.forEach((vtx, i) => {
-    const offset = i * STRIDE;
-    const buf1 = new Int32Array([...vtx.pos, vtx.styleId]);
-    const buf2 = new Float32Array(vtx.normal);
-    lineVertexData.set(new Uint8Array(buf1.buffer), offset);
-    lineVertexData.set(new Uint8Array(buf2.buffer), offset + 16);
-  });
+  const lineVertexData = new Uint16Array(tileData.lineVertex);
   device2.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
+  prepareIndexData(tileData.lineIndex);
   const lineIndexBuffer = device2.createBuffer({
-    size: tileData.lineIndex.length * 4,
+    size: tileData.lineIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
-  const lineIndexData = new Uint32Array(tileData.lineIndex);
+  const lineIndexData = new Uint16Array(tileData.lineIndex);
   device2.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
   const thinVertexBuffer = device2.createBuffer({
-    size: tileData.thinVertex.length * 16,
+    size: tileData.thinVertex.length * 2,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
-  const thinVertexData = new Int32Array(tileData.thinVertex);
+  const thinVertexData = new Int16Array(tileData.thinVertex);
   device2.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
+  prepareIndexData(tileData.thinIndex);
   const thinIndexBuffer = device2.createBuffer({
-    size: tileData.thinIndex.length * 4,
+    size: tileData.thinIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
-  const thinIndexData = new Uint32Array(tileData.thinIndex);
+  const thinIndexData = new Uint16Array(tileData.thinIndex);
   device2.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
-  const transformBuffer = device2.createBuffer({
-    size: 24,
-    // mat3x2 のサイズ
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-  });
   return {
     zxy,
-    // bindGroup,
-    transformBuffer,
     polygonVertexBuffer,
     polygonIndexBuffer,
     polygonIndexCount: tileData.polygonIndex.length,
@@ -1812,7 +1806,7 @@ var loadTile_default = async (zxy) => {
   function addThin(points, styleId) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      thinVertex.push(...p, styleId, 1);
+      thinVertex.push(...p, styleId, 0, 0, 0);
       if (i < points.length - 1) {
         thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
       }
@@ -1832,7 +1826,7 @@ var loadTile_default = async (zxy) => {
       for (let i2 = 0; i2 < ring.length; i2++) {
         const p = ring[i2];
         earcutRawData.push(p[0], p[1]);
-        polygonVertex.push(...p, styleId, 1);
+        polygonVertex.push(...p, styleId, 0, 0, 0);
         currentVertexCount++;
         if (strokeThickness > 0) {
           borderIndex.push(
@@ -1856,29 +1850,13 @@ var loadTile_default = async (zxy) => {
     for (let i = 0; i < numPoints - 1; i++) {
       const current = points[i];
       const next = points[i + 1];
-      const base = lineVertex.length;
+      const base = lineVertex.length / 6;
       const dx = next[0] - current[0];
       const dy = -next[1] + current[1];
-      lineVertex.push({
-        pos: current,
-        styleId,
-        normal: [dy, -dx]
-      });
-      lineVertex.push({
-        pos: current,
-        styleId,
-        normal: [-dy, dx]
-      });
-      lineVertex.push({
-        pos: next,
-        styleId,
-        normal: [-dy, dx]
-      });
-      lineVertex.push({
-        pos: next,
-        styleId,
-        normal: [dy, -dx]
-      });
+      lineVertex.push(...current, styleId, dy, -dx, 0);
+      lineVertex.push(...current, styleId, -dy, dx, 0);
+      lineVertex.push(...next, styleId, -dy, dx, 0);
+      lineVertex.push(...next, styleId, dy, -dx, 0);
       lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
       if (i > 0) {
         lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
@@ -1899,7 +1877,7 @@ var baseTile = {
 var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
 
 // src/js/makePipline.js
-var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, arrayStride, attributes, topology, fEntryPoint = "fs_main", isMask, stencil = {
+var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, topology, fEntryPoint = "fs_main", isMask, stencil = {
   compare: "equal",
   // ステンシル値が一致する場合のみ描画
   passOp: "keep",
@@ -1917,15 +1895,17 @@ var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, s
       entryPoint: vEntryPoint,
       buffers: [
         {
-          arrayStride,
+          arrayStride: 12,
           stepMode: "vertex",
-          attributes: attributes.map((a, i) => {
-            return {
-              shaderLocation: i,
-              offset: a[0],
-              format: a[1]
-            };
-          })
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: "sint16x2" },
+            // 座標 -> シェーダーの @location(0)
+            { shaderLocation: 1, offset: 4, format: "sint16" },
+            // 属性ID -> @location(1)
+            // offset: 6 のパディング2バイトは自動的にスキップされる
+            { shaderLocation: 2, offset: 8, format: "sint16x2" }
+            // 法線 -> @location(2)
+          ]
         }
       ]
     },
@@ -1964,7 +1944,7 @@ var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, s
       // ★パイプライン側でも4倍を明示
     }
   };
-  if (!arrayStride) {
+  if (isMask) {
     delete obj.vertex.buffers;
   }
   return device2.createRenderPipeline(obj);
@@ -2050,8 +2030,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_mask",
-    0,
-    [],
     "triangle-strip",
     "fs_dummy",
     true,
@@ -2066,11 +2044,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_polygon",
-    16,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"]
-    ],
     "triangle-list"
   );
   const thinLinePipeline = makePipline_default(
@@ -2079,11 +2052,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_thinline",
-    16,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"]
-    ],
     "line-list"
   );
   const linePipeline = makePipline_default(
@@ -2092,14 +2060,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_polyline",
-    32,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"],
-      [12, "sint32"],
-      // pad用 将来なにかに使ってね
-      [16, "float32x2"]
-    ],
     "triangle-list",
     "fs_polyline"
   );
@@ -2168,6 +2128,7 @@ async function init(viewArray) {
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);
+    console.log("tiledata:", tileData);
     const drawData = onCreateTile(device, tileData, zxy);
     visibleTiles.push(drawData);
   }
@@ -2239,7 +2200,7 @@ async function init(viewArray) {
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       }
     }
@@ -2251,7 +2212,7 @@ async function init(viewArray) {
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       }
     }
@@ -2263,7 +2224,7 @@ async function init(viewArray) {
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       }
     }
@@ -2275,7 +2236,7 @@ async function init(viewArray) {
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1);
         renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
       }
     }

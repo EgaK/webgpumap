@@ -193,7 +193,7 @@ async function jsBuild() {
     ]);
 
     const minifiedWorkerCode = fs.readFileSync(
-      "dist/statics/worker.min.js",
+      "dist/statics/worker.js",
       "utf8",
     );
 

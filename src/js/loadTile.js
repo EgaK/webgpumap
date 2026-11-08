@@ -153,7 +153,7 @@ export default async (zxy) => {
   function addThin(points, styleId) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      thinVertex.push(...p, styleId, 1); //末尾の1はアライメントのパディング
+      thinVertex.push(...p, styleId, 0, 0, 0); //末尾の1はアライメントのパディング
       if (i < points.length - 1) {
         thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
       }
@@ -183,7 +183,7 @@ export default async (zxy) => {
         // earcut用
         earcutRawData.push(p[0], p[1]);
 
-        polygonVertex.push(...p, styleId, 1);
+        polygonVertex.push(...p, styleId, 0, 0, 0); // 全部の頂点バッファの形式を揃えるために
         currentVertexCount++;
 
         // 枠線（折れ線）用の処理
@@ -218,33 +218,17 @@ export default async (zxy) => {
     for (let i = 0; i < numPoints - 1; i++) {
       const current = points[i];
       const next = points[i + 1];
-      const base = lineVertex.length;
+      const base = lineVertex.length / 6;
 
       const dx = next[0] - current[0];
       // GPU側の座標に合わせて符号を反転しておく
       const dy = -next[1] + current[1];
       // const len = Math.hypot(dx, dy) || 1.0;
 
-      lineVertex.push({
-        pos: current,
-        styleId,
-        normal: [dy, -dx],
-      });
-      lineVertex.push({
-        pos: current,
-        styleId,
-        normal: [-dy, dx],
-      });
-      lineVertex.push({
-        pos: next,
-        styleId,
-        normal: [-dy, dx],
-      });
-      lineVertex.push({
-        pos: next,
-        styleId,
-        normal: [dy, -dx],
-      });
+      lineVertex.push(...current, styleId, dy, -dx, 0);
+      lineVertex.push(...current, styleId, -dy, dx, 0);
+      lineVertex.push(...next, styleId, -dy, dx, 0);
+      lineVertex.push(...next, styleId, dy, -dx, 0);
 
       lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
 

@@ -1,12 +1,9 @@
 export default (
   device,
   commonBindGroupLayout,
-  // tileBindGroupLayout,
   presentationFormat,
   shaderModule,
   vEntryPoint,
-  arrayStride,
-  attributes,
   topology,
   fEntryPoint = "fs_main",
   isMask,
@@ -27,15 +24,14 @@ export default (
       entryPoint: vEntryPoint,
       buffers: [
         {
-          arrayStride: arrayStride,
+          arrayStride: 12,
           stepMode: "vertex",
-          attributes: attributes.map((a, i) => {
-            return {
-              shaderLocation: i,
-              offset: a[0],
-              format: a[1],
-            };
-          }),
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: "sint16x2" }, // 座標 -> シェーダーの @location(0)
+            { shaderLocation: 1, offset: 4, format: "sint16" }, // 属性ID -> @location(1)
+            // offset: 6 のパディング2バイトは自動的にスキップされる
+            { shaderLocation: 2, offset: 8, format: "sint16x2" }, // 法線 -> @location(2)
+          ],
         },
       ],
     },
@@ -72,7 +68,7 @@ export default (
       count: 4, // ★パイプライン側でも4倍を明示
     },
   };
-  if (!arrayStride) {
+  if (isMask) {
     delete obj.vertex.buffers;
   }
   return device.createRenderPipeline(obj);

@@ -1,85 +1,65 @@
-export default function onCreateTile(
-  device,
-  // tileBindGroupLayout,
-  tileData,
-  zxy,
-) {
+export default function onCreateTile(device, tileData, zxy) {
+  const prepareIndexData = (data) => {
+    if (data.length % 2 != 0) {
+      const last = data[data.length - 1];
+      data.push(last);
+    }
+  };
   const polygonVertexBuffer = device.createBuffer({
-    size: tileData.polygonVertex.length * 16,
+    size: tileData.polygonVertex.length * 2,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
-  const polygonVertexData = new Int32Array(tileData.polygonVertex);
+  const polygonVertexData = new Int16Array(tileData.polygonVertex);
   device.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
 
+  prepareIndexData(tileData.polygonIndex);
   const polygonIndexBuffer = device.createBuffer({
-    size: tileData.polygonIndex.length * 4,
+    size: tileData.polygonIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
   });
-  const polygonIndexData = new Uint32Array(tileData.polygonIndex);
+  const polygonIndexData = new Uint16Array(tileData.polygonIndex);
   device.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
 
+  prepareIndexData(tileData.borderIndex);
   const borderIndexBuffer = device.createBuffer({
-    size: tileData.borderIndex.length * 4,
+    size: tileData.borderIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
   });
-  const borderIndexData = new Uint32Array(tileData.borderIndex);
+  const borderIndexData = new Uint16Array(tileData.borderIndex);
   device.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
 
-  let STRIDE = 32;
-  const lineVertexBufferSize = tileData.lineVertex.length * STRIDE;
   const lineVertexBuffer = device.createBuffer({
-    size: lineVertexBufferSize,
+    size: tileData.lineVertex.length * 2,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
-  const lineVertexData = new Uint8Array(lineVertexBufferSize);
-  tileData.lineVertex.forEach((vtx, i) => {
-    const offset = i * STRIDE;
-    const buf1 = new Int32Array([...vtx.pos, vtx.styleId]);
-    const buf2 = new Float32Array(vtx.normal);
-
-    lineVertexData.set(new Uint8Array(buf1.buffer), offset);
-    lineVertexData.set(new Uint8Array(buf2.buffer), offset + 16);
-  });
+  const lineVertexData = new Uint16Array(tileData.lineVertex);
   device.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
 
+  prepareIndexData(tileData.lineIndex);
   const lineIndexBuffer = device.createBuffer({
-    size: tileData.lineIndex.length * 4,
+    size: tileData.lineIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
   });
-  const lineIndexData = new Uint32Array(tileData.lineIndex);
+  const lineIndexData = new Uint16Array(tileData.lineIndex);
   device.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
 
   const thinVertexBuffer = device.createBuffer({
-    size: tileData.thinVertex.length * 16,
+    size: tileData.thinVertex.length * 2,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
-  const thinVertexData = new Int32Array(tileData.thinVertex);
+  const thinVertexData = new Int16Array(tileData.thinVertex);
   device.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
 
+  prepareIndexData(tileData.thinIndex);
   const thinIndexBuffer = device.createBuffer({
-    size: tileData.thinIndex.length * 4,
+    size: tileData.thinIndex.length * 2,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
   });
-  const thinIndexData = new Uint32Array(tileData.thinIndex);
+  const thinIndexData = new Uint16Array(tileData.thinIndex);
   device.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
-
-  const transformBuffer = device.createBuffer({
-    size: 24, // mat3x2 のサイズ
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
-
-  // そのタイル固有のBindGroup（グループ1の実体）を作成
-  // const bindGroup = device.createBindGroup({
-  //   layout: tileBindGroupLayout, // グループ1の設計図を指定
-  //   entries: [
-  //     { binding: 0, resource: { buffer: transformBuffer } }, // 実体バッファ
-  //   ],
-  // });
 
   return {
     zxy,
-    // bindGroup,
-    transformBuffer,
     polygonVertexBuffer,
     polygonIndexBuffer,
     polygonIndexCount: tileData.polygonIndex.length,

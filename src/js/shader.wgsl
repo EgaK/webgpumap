@@ -1,12 +1,7 @@
-struct PrimitiveVertex {
+struct Vertex {
   @location(0) pos: vec2i,
   @location(1) style_id: i32,
-}
-struct PolylineVertex {
-  @location(0) pos: vec2i,
-  @location(1) style_id: i32,
-  @location(2) pad: i32,
-  @location(3) normal: vec2f,
+  @location(2) normal: vec2i,
 }
 
 struct Style {
@@ -58,7 +53,7 @@ fn sheer(color:vec3f, o: f32) -> vec4f {
 }
 
 @vertex
-fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
+fn vs_polygon(input:Vertex) -> VertexOutput {
   var output: VertexOutput;
   let prop = uniforms.styles[input.style_id];
   let cam_pos = transform.matrix*vec3f(vec2f(input.pos), 1.0);
@@ -70,7 +65,7 @@ fn vs_polygon(input:PrimitiveVertex) -> VertexOutput {
 }
 
 @vertex
-fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
+fn vs_thinline(input:Vertex) -> VertexOutput {
   var output: VertexOutput;
   let prop = uniforms.styles[input.style_id];
   let cam_pos = transform.matrix*vec3f(vec2f(input.pos), 1.0);
@@ -82,7 +77,7 @@ fn vs_thinline(input:PrimitiveVertex) -> VertexOutput {
 
 @vertex
 fn vs_polyline(
-  input: PolylineVertex,
+  input: Vertex,
 ) -> VertexOutput {
   var output: VertexOutput;
   let prop = uniforms.styles[input.style_id];
@@ -100,7 +95,7 @@ fn vs_polyline(
     thickness = mix(style.min_val, style.max_val, t);
   }
 
-  let normal = normalize(input.normal);
+  let normal = normalize(vec2f(input.normal));
 
   // 画面の縦解像度(w)を基準に、指定ピクセル幅（prop.thickness）の半分だけオフセット
   let thickness_ndc = thickness / 512.0;

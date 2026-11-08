@@ -106,8 +106,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_mask",
-    0,
-    [],
     "triangle-strip",
     "fs_dummy",
     true,
@@ -123,11 +121,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_polygon",
-    16,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"],
-    ],
     "triangle-list",
   );
 
@@ -137,11 +130,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_thinline",
-    16,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"],
-    ],
     "line-list",
   );
 
@@ -151,13 +139,6 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_polyline",
-    32,
-    [
-      [0, "sint32x2"],
-      [8, "sint32"],
-      [12, "sint32"], // pad用 将来なにかに使ってね
-      [16, "float32x2"],
-    ],
     "triangle-list",
     "fs_polyline",
   );
@@ -237,30 +218,11 @@ async function init(viewArray) {
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile(zxy);
+    console.log("tiledata:", tileData);
     const drawData = onCreateTile(device, tileData, zxy);
     visibleTiles.push(drawData);
   }
 
-  //   function updateCamera(zxy, buffer) {
-  //     // Uniformにはzoom情報のみ
-  //     device.queue.writeBuffer(
-  //       styleUniformBuffer,
-  //       0,
-  //       new Float32Array([viewArray[2]]),
-  //     );
-  //
-  //     const matrix = computeTileMatrix3x2(
-  //       ...zxy,
-  //       4096,
-  //       viewArray[0],
-  //       viewArray[1],
-  //       viewArray[2],
-  //       ...size,
-  //     );
-  //     device.queue.writeBuffer(buffer, 0, matrix);
-  //   }
-
-  // updateCamera(zxys[0]);
   updateCanvasSize(size);
 
   function render() {
@@ -337,10 +299,9 @@ async function init(viewArray) {
       if (tile.polygonIndexCount > 0) {
         const dynamicOffset = i * 256;
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
       }
     }
@@ -354,7 +315,7 @@ async function init(viewArray) {
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
-        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
       }
     }
@@ -368,7 +329,7 @@ async function init(viewArray) {
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
-        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
       }
     }
@@ -382,7 +343,7 @@ async function init(viewArray) {
         renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
         renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
         renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
-        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint32");
+        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint16");
         renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
       }
     }

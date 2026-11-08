@@ -283,7 +283,2292 @@ canvas.css({
   height: context_default.mapHeight + "px"
 });
 var offcanvas = canvas[0].transferControlToOffscreen();
-var blob = new Blob(['function aa(a,b){var c=C,k=c.createBuffer({size:a.Y.length*16,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST}),d=new Int32Array(a.Y);c.queue.writeBuffer(k,0,d);d=c.createBuffer({size:a.S.length*4,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST});var e=new Uint32Array(a.S);c.queue.writeBuffer(d,0,e);e=c.createBuffer({size:a.O.length*4,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST});var f=new Uint32Array(a.O);c.queue.writeBuffer(e,0,f);var g=a.W.length*32;f=c.createBuffer({size:g,usage:GPUBufferUsage.VERTEX|\nGPUBufferUsage.COPY_DST});var l=new Uint8Array(g);a.W.forEach((p,r)=>{r*=32;var x=new Int32Array([...p.i,p.J]);p=new Float32Array(p.I);l.set(new Uint8Array(x.buffer),r);l.set(new Uint8Array(p.buffer),r+16)});c.queue.writeBuffer(f,0,l);g=c.createBuffer({size:a.R.length*4,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST});var m=new Uint32Array(a.R);c.queue.writeBuffer(g,0,m);m=c.createBuffer({size:a.aa.length*16,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST});var n=new Int32Array(a.aa);c.queue.writeBuffer(m,\n0,n);n=c.createBuffer({size:a.T.length*4,usage:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST});var q=new Uint32Array(a.T);c.queue.writeBuffer(n,0,q);c=c.createBuffer({size:24,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});return{oa:b,qa:c,Z:k,ka:d,X:a.S.length,ga:e,U:a.O.length,ja:f,ia:g,V:a.R.length,ma:m,la:n,$:a.T.length}}function D(a,b){this.x=a;this.y=b}function ba(a,b){a.x/=b;a.y/=b;return a}\nD.prototype={clone(){return new D(this.x,this.y)},add(a){var b=this.clone();b.x+=a.x;b.y+=a.y;return b},sub(a){var b=this.clone();b.x-=a.x;b.y-=a.y;return b},div(a){return ba(this.clone(),a)},rotate(a){var b=this.clone(),c=Math.cos(a);a=Math.sin(a);var k=a*b.x+c*b.y;b.x=c*b.x-a*b.y;b.y=k;return b},unit(){var a=this.clone();ba(a,Math.sqrt(a.x*a.x+a.y*a.y));return a},round(){var a=this.clone();a.x=Math.round(a.x);a.y=Math.round(a.y);return a},equals(a){return this.x===a.x&&this.y===a.y},angle(){return Math.atan2(this.y,\nthis.x)},constructor:D};function ca(a){if(a.L<0)console.log("feature has no geometry");else{var b=a.D;b.i=a.L;for(var c=F(b)+b.i,k=[],d,e=1,f=0,g=0,l=0;b.i<c;){if(f<=0&&(f=F(b),e=f&7,f>>=3,f===0))continue;f--;if(e===1)g+=G(b),l+=G(b),d&&k.push(d),d=[new D(g,l)];else if(e===2)g+=G(b),l+=G(b),d&&d.push(new D(g,l));else if(e===7)d&&d.push(d[0].clone());else{console.log(`unknown command ${e}`);return}}d&&k.push(d);return{lines:k,F:a.F}}}\nvar da=class{constructor(a,b,c,k,d){this.F=Object.create(null);this.P=c;this.type=0;this.id=void 0;this.D=a;this.L=-1;this.M=k;for(this.N=d;a.i<b;)if(c=F(a),c===8)this.id=F(a);else if(c===18)for(c=F(a)+a.i;a.i<c;){let e=k[F(a)],f=d[F(a)];this.F[e]=f}else c===24?this.type=F(a):(c===34&&(this.L=a.i),M(a,c))}};function ea(a,b){if(b<0||b>=a.H.length)console.log("feature index out of bounds");else return a.D.i=a.H[b],b=F(a.D)+a.D.i,new da(a.D,b,a.P,a.M,a.N)}\nvar ia=class{constructor(a,b){this.version=1;this.name="";this.P=4096;this.length=0;this.D=a;this.M=[];this.N=[];this.H=[];b===void 0&&(b=a.length);for(;a.i<b;){var c=F(a);if(c===10)this.name=fa(a);else if(c===18)this.H.push(a.i),M(a,c);else if(c===26)this.M.push(fa(a));else if(c===34){c=this.N;var k=c.push;{var d=a;var e=null;let f=F(d)+d.i;for(;d.i<f;)e=F(d),e===10?e=fa(d):e===21?(e=ha(d.v,d.i,23,4),d.i+=4):e===25?(e=ha(d.v,d.i,52,8),d.i+=8):e=e===32?F(d,!0):e===40?F(d):e===48?G(d):e===56?!!F(d):\n(M(d,e),null);e==null?(console.log("unknown feature value"),d=void 0):d=e}k.call(c,d)}else c===40?this.P=F(a):c===120?this.version=F(a):M(a,c)}this.length=this.H.length}},ja=class{constructor(a,b=a.length){for(var c=Object.create(null);a.i<b;){var k=F(a);k===26?(k=new ia(a,F(a)+a.i),k.length&&(c[k.name]=k)):M(a,k)}this.ha=c}},ha=(a,b,c,k)=>{var d=k*8-c-1;var e=(1<<d)-1,f=e>>1,g=-7,l=k-1,m=a[b+l];l+=-1;k=m&(1<<-g)-1;m>>=-g;for(g+=d;g>0;k=k*256+a[b+l],l+=-1,g-=8);d=k&(1<<-g)-1;k>>=-g;for(g+=c;g>0;d=\nd*256+a[b+l],l+=-1,g-=8);if(k===0)k=1-f;else{if(k===e)return d?NaN:(m?-1:1)*Infinity;d+=Math.pow(2,c);k-=f}return(m?-1:1)*d*Math.pow(2,k-c)};function ka(a){this.v=ArrayBuffer.isView&&ArrayBuffer.isView(a)?a:new Uint8Array(a||0);this.type=this.i=0;this.length=this.v.length}\nfunction F(a,b){var c=a.v;var k=c[a.i++];var d=k&127;if(k<128)return d;k=c[a.i++];d|=(k&127)<<7;if(k<128)return d;k=c[a.i++];d|=(k&127)<<14;if(k<128)return d;k=c[a.i++];d|=(k&127)<<21;if(k<128)return d;k=c[a.i];return la(d|(k&15)<<28,b,a)}function M(a,b){b&=7;if(b===0)for(;a.v[a.i++]>127;);else b===2?a.i=F(a)+a.i:b===5?a.i+=4:b===1?a.i+=8:console.log("Unimplemented type: "+b)}function G(a){a=F(a);return a%2===1?(a+1)/-2:a/2}\nfunction fa(a){var b=F(a)+a.i;var c=a.v;for(var k="",d=a.i;d<b;){var e=c[d],f=null,g=e>239?4:e>223?3:e>191?2:1;if(d+g>b)break;if(g===1)e<128&&(f=e);else if(g===2){var l=c[d+1];(l&192)===128&&(f=(e&31)<<6|l&63,f<=127&&(f=null))}else if(g===3){l=c[d+1];var m=c[d+2];(l&192)===128&&(m&192)===128&&(f=(e&15)<<12|(l&63)<<6|m&63,f<=2047||f>=55296&&f<=57343)&&(f=null)}else if(g===4){l=c[d+1];m=c[d+2];var n=c[d+3];(l&192)===128&&(m&192)===128&&(n&192)===128&&(f=(e&15)<<18|(l&63)<<12|(m&63)<<6|n&63,f<=65535||\nf>=1114112)&&(f=null)}f===null?(f=65533,g=1):f>65535&&(f-=65536,k+=String.fromCharCode(f>>>10&1023|55296),f=56320|f&1023);k+=String.fromCharCode(f);d+=g}c=k;a.i=b;return c}ka.prototype={destroy:function(){this.v=null}};\nvar la=(a,b,c)=>{var k=c.v;var d=k[c.i++];var e=(d&112)>>4;if(d<128)return O(a,e,b);d=k[c.i++];e|=(d&127)<<3;if(d<128)return O(a,e,b);d=k[c.i++];e|=(d&127)<<10;if(d<128)return O(a,e,b);d=k[c.i++];e|=(d&127)<<17;if(d<128)return O(a,e,b);d=k[c.i++];e|=(d&127)<<24;if(d<128)return O(a,e,b);d=k[c.i++];e|=(d&1)<<31;if(d<128)return O(a,e,b);console.log("Expected varint not more than 10 bytes")},O=(a,b,c)=>c?b*4294967296+(a>>>0):(b>>>0)*4294967296+(a>>>0),P=new Set,ma=!1;\nfunction na(a,b){var c=b&&b.length,k=c?b[0]*2:a.length;P.size&&P.clear();var d=oa(a,0,k,!0),e=[];if(!d||d.next===d.j)return e;var f=0,g=0,l=0;if(c){c=d;d=[];for(let q=0,p=b.length;q<p;q++){var m=oa(a,b[q]*2,q<p-1?b[q+1]*2:a.length,!1);m===m.next&&P.add(m);var n=m;let r=m;do{if(n.x<r.x||n.x===r.x&&n.y<r.y)r=n;n=n.next}while(n!==m);d.push(r)}d.sort(pa);b=b.length;b=Math.ceil((a.length/2+2*b)/qa)+b+2;Q.length<b*4&&(Q=new Float64Array(b*4));ra=0;sa(c,c);ta=!0;for(b=0;b<d.length;b++)a:{m=d[b];n=c;c=ua(m,\nn);if(!c){c=n;break a}m=va(c,m);sa(c,m.next.next);R(m,m.next);c=R(c,c.next)}ta=!1;d=R(c)}if(a.length>160){f=a[0];g=a[1];l=f;c=g;for(b=2;b<k;b+=2)m=a[b],n=a[b+1],m<f&&(f=m),n<g&&(g=n),m>l&&(l=m),n>c&&(c=n);l=Math.max(l-f,c-g);l=l!==0?32767/l:0}xa(d,e,f,g,l);return e}\nfunction oa(a,b,c,k){var d=null,e=0;for(let f=b,g=c-2;f<c;f+=2)e+=(a[g]-a[f])*(a[f+1]+a[g+1]),g=f;if(k===e>0)for(;b<c;b+=2)d=ya(b/2|0,a[b],a[b+1],d);else for(c-=2;c>=b;c-=2)d=ya(c/2|0,a[c],a[c+1],d);d&&S(d,d.next)&&(T(d),d=d.next);return d}function R(a,b=a){var c=b===a;do{var k=!1;if(!(a===a.next||P.size!==0&&P.has(a)||!S(a,a.next)&&U(a.j,a,a.next)!==0)){if(c||a===b)b=a.j;ma=!0;T(a);a=a.j;k=!0}else if(c||a!==b)a=a.next,k=!c}while(k||a!==b);return b}\nfunction xa(a,b,c,k,d){if(d){var e=a,f=e,g=0;do f.z=za(f.x,f.y,c,k,d),V[g++]=f,f=f.next;while(f!==e);e=g;if(e<=32)for(f=1;f<e;f++){for(var l=V[f],m=l.z,n=f-1;n>=0&&V[n].z>m;)V[n+1]=V[n],n--;V[n+1]=l}else{W.length<e&&(W=new Uint32Array(e),Aa=new Uint32Array(e),X=Array(e));for(f=0;f<e;f++)W[f]=V[f].z;Ba(e,V,W,X,Aa,0);Ba(e,X,Aa,V,W,8);Ba(e,V,W,X,Aa,16);Ba(e,X,Aa,V,W,24)}e=null;for(f=0;f<g;f++){l=V[f];if(l.C=e)e.A=l;e=l}e.A=null;V.fill(null,0,g);X.fill(null,0,g)}g=a;for(e=!1;a.j!==a.next;){f=a.j;l=a.next;\nif(m=U(f,a,l)<0)if(d)a:{var q=a.j;m=a.next;n=q.x;var p=a.x,r=m.x;q=q.y;var x=a.y,H=m.y,v=Math.min(n,p,r),w=Math.min(q,x,H),z=Math.max(n,p,r),N=Math.max(q,x,H),E=za(v,w,c,k,d),t=za(z,N,c,k,d);let u=a.C;for(;u&&u.z>=E;){if(u.x>=v&&u.x<=z&&u.y>=w&&u.y<=N&&u!==m&&(n!==u.x||q!==u.y)&&Ca(n,q,p,x,r,H,u.x,u.y)&&U(u.j,u,u.next)>=0){m=!1;break a}u=u.C}for(E=a.A;E&&E.z<=t;){if(E.x>=v&&E.x<=z&&E.y>=w&&E.y<=N&&E!==m&&(n!==E.x||q!==E.y)&&Ca(n,q,p,x,r,H,E.x,E.y)&&U(E.j,E,E.next)>=0){m=!1;break a}E=E.A}m=!0}else a:{m=\na.j;t=a.next;n=m.x;p=a.x;r=t.x;q=m.y;x=a.y;H=t.y;v=Math.min(n,p,r);w=Math.min(q,x,H);z=Math.max(n,p,r);N=Math.max(q,x,H);for(t=t.next;t!==m;){if(t.x>=v&&t.x<=z&&t.y>=w&&t.y<=N&&(n!==t.x||q!==t.y)&&Ca(n,q,p,x,r,H,t.x,t.y)&&U(t.j,t,t.next)>=0){m=!1;break a}t=t.next}m=!0}if(m)b.push(f.m,a.m,l.m),T(a),g=a=l;else if(a=l,a===g)if(ma=!1,a=R(a),ma)g=a;else if(e){a:{g=a;do{for(e=g.next.next;e!==g.j;){if(f=g.m!==e.m){f=S(g,e)&&U(g.j,g,g.next)>0&&U(e.j,e,e.next)>0;if(l=g.next.m!==e.m&&(f||Da(g,e)&&Da(e,g)&&\n(U(g.j,g,e.j)!==0||U(g,e.j,e)!==0))){b:{l=Math.min(g.x,e.x);m=Math.max(g.x,e.x);n=Math.min(g.y,e.y);p=Math.max(g.y,e.y);r=g;do{q=r.next;if(!(r.x>m&&q.x>m||r.x<l&&q.x<l||r.y>p&&q.y>p||r.y<n&&q.y<n)&&r.m!==g.m&&q.m!==g.m&&r.m!==e.m&&q.m!==e.m&&Ea(r,q,g,e)){l=!0;break b}r=q}while(r!==g);l=!1}l=!l}if(l){if(!f){f=g;l=!1;m=(g.x+e.x)/2;n=(g.y+e.y)/2;do p=f.next,f.y>n!==p.y>n&&m<(p.x-f.x)*(n-f.y)/(p.y-f.y)+f.x&&(l=!l),f=p;while(f!==g);f=l}l=f}f=l}if(f){a=va(g,e);g=R(g,g.next);a=R(a,a.next);xa(g,b,c,k,d);\nxa(a,b,c,k,d);break a}e=e.next}g=g.next}while(g!==a)}break}else{g=b;e=a;f=!1;do l=e.j,m=e.next.next,Ea(l,e,e.next,m,!1)&&Da(l,m)&&Da(m,l)&&(g.push(l.m,e.m,m.m),T(e),T(e.next),e=a=m,f=!0),e=e.next;while(e!==a);g=a=f?R(e):e;e=!0}}}var ta=!1;function pa(a,b){return a.x-b.x||a.y-b.y||(a.next.y-a.y)/(a.next.x-a.x)-(b.next.y-b.y)/(b.next.x-b.x)}var qa=16,Q=new Float64Array(0),ra=0,Fa=[],Ga=[];\nfunction sa(a,b){do{var c=ra++;Fa[c]=a;let k=a.x,d=a.y,e=a.x,f=a.y,g=0;do{let l=a.next;a.z=c;l.x<k&&(k=l.x);l.x>e&&(e=l.x);l.y<d&&(d=l.y);l.y>f&&(f=l.y);a=l}while(++g<qa&&a!==b);Ga[c]=a;c*=4;Q[c]=k;Q[c+1]=d;Q[c+2]=e;Q[c+3]=f}while(a!==b)}function Ha(a){for(var b=Ga[a];b.j.next!==b;)b=b.next;return Ga[a]=b}function Ia(a){for(var b=Fa[a];b.j.next!==b;)b=b.next;return Fa[a]=b}\nfunction ua(a,b){var c=a.x,k=a.y,d=-Infinity;if(S(a,b))return b;for(let q=0,p=0;q<ra;q++,p+=4){if(k<Q[p+1]||k>Q[p+3]||Q[p]>c||Q[p+2]<=d)continue;var e=Ha(q);b=Ia(q);do{if(b.j.next===b){if(S(a,b.next))return b.next;if(k<=b.y&&k>=b.next.y&&b.next.y!==b.y){var f=b.x+(k-b.y)*(b.next.x-b.x)/(b.next.y-b.y);if(f<=c&&f>d){d=f;var g=b.x<b.next.x?b:b.next;if(f===c)return g}}}b=b.next}while(b!==e)}if(!g)return null;e=g.x;f=g.y;var l=Math.min(k,f),m=Math.max(k,f),n=Infinity;for(let q=0,p=0;q<ra;q++,p+=4){if(Q[p+\n2]<e||Q[p]>c||Q[p+3]<l||Q[p+1]>m)continue;let r=Ha(q);b=Ia(q);do{if(b.j.next===b&&c>=b.x&&b.x>=e&&c!==b.x&&Ca(k<f?c:d,k,e,f,k<f?d:c,k,b.x,b.y)){let x=Math.abs(k-b.y)/(c-b.x);(Da(b,a)||b.y===k&&b.next.y===k&&b.next.x>c)&&(x<n||x===n&&(b.x>g.x||b.x===g.x&&U(g.j,g,b.j)<0&&U(b.next,g,g.next)<0))&&(g=b,n=x)}b=b.next}while(b!==r)}return g}var V=[],X=[],W=new Uint32Array(0),Aa=new Uint32Array(0),Ja=new Uint32Array(256);\nfunction Ba(a,b,c,k,d,e){Ja.fill(0);for(var f=0;f<a;f++)Ja[c[f]>>>e&255]++;f=0;for(var g=0;g<256;g++){var l=Ja[g];Ja[g]=f;f+=l}for(f=0;f<a;f++)g=c[f],l=Ja[g>>>e&255]++,k[l]=b[f],d[l]=g}function za(a,b,c,k,d){a=(a-c)*d|0;b=(b-k)*d|0;a=(a|a<<8)&16711935;a=(a|a<<4)&252645135;a=(a|a<<2)&858993459;b=(b|b<<8)&16711935;b=(b|b<<4)&252645135;b=(b|b<<2)&858993459;return(a|a<<1)&1431655765|((b|b<<1)&1431655765)<<1}\nfunction Ca(a,b,c,k,d,e,f,g){return(d-f)*(b-g)>=(a-f)*(e-g)&&(a-f)*(k-g)>=(c-f)*(b-g)&&(c-f)*(e-g)>=(d-f)*(k-g)}function U(a,b,c){return(b.y-a.y)*(c.x-b.x)-(b.x-a.x)*(c.y-b.y)}function S(a,b){return a.x===b.x&&a.y===b.y}function Ea(a,b,c,k,d=!0){var e=U(a,b,c),f=U(a,b,k),g=U(c,k,a),l=U(c,k,b);return(e>0&&f<0||e<0&&f>0)&&(g>0&&l<0||g<0&&l>0)?!0:d?e===0&&Ka(a,c,b)||f===0&&Ka(a,k,b)||g===0&&Ka(c,a,k)||l===0&&Ka(c,b,k)?!0:!1:!1}\nfunction Ka(a,b,c){return b.x<=Math.max(a.x,c.x)&&b.x>=Math.min(a.x,c.x)&&b.y<=Math.max(a.y,c.y)&&b.y>=Math.min(a.y,c.y)}function Da(a,b){return U(a.j,a,a.next)<0?U(a,b,a.next)>=0&&U(a,a.j,b)>=0:U(a,b,a.j)<0||U(a,a.next,b)<0}function va(a,b){var c=La(a.m,a.x,a.y),k=La(b.m,b.x,b.y),d=a.next,e=b.j;a.next=b;b.j=a;c.next=d;d.j=c;k.next=c;c.j=k;e.next=k;k.j=e;return k}function ya(a,b,c,k){a=La(a,b,c);k?(a.next=k.next,a.j=k,k.next.j=a,k.next=a):(a.j=a,a.next=a);return a}\nfunction T(a){a.next.j=a.j;a.j.next=a.next;a.C&&(a.C.A=a.A);a.A&&(a.A.C=a.C);if(ta){var b=a.next;a=a.j.z*4;b.x<Q[a]&&(Q[a]=b.x);b.y<Q[a+1]&&(Q[a+1]=b.y);b.x>Q[a+2]&&(Q[a+2]=b.x);b.y>Q[a+3]&&(Q[a+3]=b.y)}}function La(a,b,c){return{m:a,x:b,y:c,j:null,next:null,z:0,C:null,A:null}}\nvar Ma=(...a)=>{for(var b={},c=0;c<a.length;c+=2)b[a[c]]=a[c+1];self.postMessage(b)},Na=[{l:"l",o:"t",u:[.59,.59,.59],B:[[15,20],[18,50]]},{l:"f",o:"b",u:[.94,.96,.94],B:1,G:[[14,0],[17,1]]},{l:"l",o:"r1",u:[.39,.39,.39],B:1,G:[[16,0],[18,1]]},{l:"l",o:"r2",u:[.77,.63,0],B:1},{l:"f",o:"r5",u:[1,1,1]},{l:"f",o:"r3",u:[1,.77,.6]},{l:"l",o:"r8",u:[1,.77,.6],B:[[10,5],[13,10]]},{l:"f",o:"r4",u:[.93,.86,.58]},{l:"l",o:"r9",u:[.93,.86,.58],B:[[10,5],[16,30]]},{l:"l",o:"r6",u:[.39,.39,.39],B:2},{l:"f",o:"w",\nu:[.66,.86,1]},{l:"f",o:"g",u:[.8,.93,.66]},{l:"p",o:"c",u:[.4,.4,.4],K:14,pa:10},{l:"p",o:"rt",K:12,ba:{border:"1px solid #fff","border-radius":"4px 4px 50% 50%",background:"#06a",padding:"5px",color:"#fff"}},{l:"p",o:"d",u:[.4,.4,.4],K:12,G:[[13,0],[14,1]]},{l:"s",o:"p"}],Oa=async a=>{function b(t,u,B){for(var J=[],A=0;A<t.length;A++){let K=ea(t,A),y=ca(K),I=y.F.c,L=y.F.t;I=="bs"&&L&&(L=L.replace("S","\\u897f\\u80a5\\u30d0\\u30b9").replace("W","\\u662d\\u548c\\u30d0\\u30b9"));J.push({p:y.lines[0][0],t:K.F.n,\nd:L,c:I})}Ma("d",{f:J,p:{type:u.l,layer:u.o,color:u.u,size:u.K,opacity:u.G,css:u.ba},z:B})}function c(t){var u=0;for(let B=0;B<t.length;B++){let J=t[B],A=t[(B+1)%t.length];u+=(A[0]-J[0])*(A[1]+J[1])}return u<0}function k(t,u){var B=u.ca,J=u.B||0;if(u.l=="f")for(u=0;u<t.length;u++){var A=ea(t,u);if(A.type!==3)continue;var K=ca(A).lines;A=[];for(var y of K){if(y.length===0)continue;K=y.map(I=>[I.x,I.y]);c(K)?(A.length>0&&e(A,B,J),A=[K]):A.push(K)}A.length>0&&e(A,B,J)}else for(u=0;u<t.length;u++){y=\nea(t,u);if(y.type!==2)continue;y=ca(y).lines;for(A of y){if(A.length===0)continue;y=A.map(I=>[I.x,I.y]);J!=1?f(y,B):d(y,B)}}}function d(t,u){for(let B=0;B<t.length;B++)x.push(...t[B],u,1),B<t.length-1&&H.push(v+B,v+B+1);v+=t.length}function e(t,u,B){var J=[],A=[],K=0;for(let y=0;y<t.length;y++){let I=t[y];if(I.length){y>0&&A.push(K);for(let L=0;L<I.length;L++){let wa=I[L];J.push(wa[0],wa[1]);g.push(...wa,u,1);K++;B>0&&n.push(q+L,q+(L+1==I.length?0:L+1))}q+=I.length}}t=na(J,A);t.length&&(t.forEach(y=>\n{m.push(l+y)}),l+=K)}function f(t,u){var B=t.length;if(!(B<2))for(let J=0;J<B-1;J++){let A=t[J],K=t[J+1],y=p.length,I=K[0]-A[0],L=-K[1]+A[1];p.push({i:A,J:u,I:[L,-I]});p.push({i:A,J:u,I:[-L,I]});p.push({i:K,J:u,I:[-L,I]});p.push({i:K,J:u,I:[L,-I]});r.push(y,y+1,y+2,y+2,y+3,y);J>0&&r.push(y,y-1,y+1,y+1,y-2,y)}}var g=[],l=0,m=[],n=[],q=0,p=[],r=[],x=[],H=[],v=0,w=await fetch("https://192.168.11.2/t/"+a.join("/"));w=await new ka(await w.arrayBuffer());w=(new ja(w)).ha;for(var z=Na.length;z--;){var N=\nNa[z],E=w[N.o];E&&(/p|s/.test(N.l)?b(E,N,a):k(E,N))}return{Y:g,S:m,O:n,W:p,R:r,aa:x,T:H}},Pa=(a,b,c,k,d,e,f,g="fs_main",l,m={compare:"equal",passOp:"keep",failOp:"keep",depthFailOp:"keep"})=>{var n=C;a={layout:n.createPipelineLayout({bindGroupLayouts:[a]}),vertex:{module:c,entryPoint:k,buffers:[{arrayStride:d,stepMode:"vertex",attributes:e.map((q,p)=>({shaderLocation:p,offset:q[0],format:q[1]}))}]},fragment:{module:c,entryPoint:g,targets:[{format:b,blend:{color:{srcFactor:"src-alpha",dstFactor:"one-minus-src-alpha",\noperation:"add"},alpha:{srcFactor:"one",dstFactor:"one-minus-src-alpha",operation:"add"}}}]},primitive:{topology:f,cullMode:"none"},depthStencil:{format:"depth24plus-stencil8",depthWriteEnabled:!l,depthCompare:l?"always":"greater",stencilFront:m,stencilBack:m},multisample:{count:4}};d||delete a.vertex.buffers;return n.createRenderPipeline(a)},Y,Z,C,Qa,Ra,Sa,Ta,Ua,Va,Wa;({fa:Ta,da:Ua,ea:Va,na:Wa}={fa:10,da:879,ea:410,na:1024});\nself.onmessage=async a=>{a.data.c?(Y=a.data.c,Z=a.data.s,a=new Float32Array(a.data.b),Xa(a)):a.data.s&&(Z=a.data.s,Y.width=Z[0],Y.height=Z[1],Ya())};\nasync function Xa(a){function b(){requestAnimationFrame(b);if(a[3]){var x=performance.now(),H=C.createCommandEncoder(),v=H.beginRenderPass({colorAttachments:[{view:Ra.createView(),resolveTarget:k.getCurrentTexture().createView(),clearValue:{r:.96,g:.97,b:.98,a:1},loadOp:"clear",storeOp:"discard"}],depthStencilAttachment:{view:Sa.createView(),depthClearValue:0,depthLoadOp:"clear",depthStoreOp:"store",stencilClearValue:0,stencilLoadOp:"clear",stencilStoreOp:"store"}});C.queue.writeBuffer(Qa,0,new Float32Array([a[2]]));\nvar w=new Float32Array(r.length*64);v.setPipeline(f);for(var z=0;z<r.length;z++){let N=Za(...r[z].oa,4096,a[0],a[1],a[2],...Z);w.set(N,z*64)}C.queue.writeBuffer(q,0,w);v.setPipeline(f);for(w=0;w<r.length;w++)v.setBindGroup(0,p,[w*256]),v.setStencilReference(w+1),v.draw(4,1,0,0);v.setPipeline(g);for(w=0;w<r.length;w++)z=r[w],z.X>0&&(v.setBindGroup(0,p,[w*256]),v.setStencilReference(w+1),v.setVertexBuffer(0,z.Z),v.setIndexBuffer(z.ka,"uint32"),v.drawIndexed(z.X,1,0,0,0));v.setPipeline(l);for(w=0;w<\nr.length;w++)z=r[w],z.U>0&&(v.setBindGroup(0,p,[w*256]),v.setStencilReference(w+1),v.setVertexBuffer(0,z.Z),v.setIndexBuffer(z.ga,"uint32"),v.drawIndexed(z.U,1,0,0,0));v.setPipeline(m);for(w=0;w<r.length;w++)z=r[w],z.V>0&&(v.setBindGroup(0,p,[w*256]),v.setStencilReference(w+1),v.setVertexBuffer(0,z.ja),v.setIndexBuffer(z.ia,"uint32"),v.drawIndexed(z.V,1,0,0,0));v.setPipeline(l);for(w=0;w<r.length;w++)z=r[w],z.$>0&&(v.setBindGroup(0,p,[w*256]),v.setStencilReference(w+1),v.setVertexBuffer(0,z.ma),v.setIndexBuffer(z.la,\n"uint32"),v.drawIndexed(z.$,1,0,0,0));v.end();C.queue.submit([H.finish()]);a[3]=0;Ma("t",performance.now()-x)}}if(C=await (await navigator.gpu?.requestAdapter())?.requestDevice()){C.pushErrorScope("validation");var c=await C.popErrorScope();c&&console.error("WebGPU \\u30d0\\u30ea\\u30c7\\u30fc\\u30b7\\u30e7\\u30f3\\u30a8\\u30e9\\u30fc:",c.message);C.lost.then(x=>{console.error(`WebGPU \\u30C7\\u30D0\\u30A4\\u30B9\\u304C\\u55AA\\u5931\\u3057\\u307E\\u3057\\u305F\\u3002\\u7406\\u7531: ${x.reason}`);console.error(`\\u30E1\\u30C3\\u30BB\\u30FC\\u30B8: ${x.message}`);\nx.reason==="destroyed"?console.log("\\u30c7\\u30d0\\u30a4\\u30b9\\u306f\\u610f\\u56f3\\u7684\\u306b\\u7834\\u68c4\\u3055\\u308c\\u307e\\u3057\\u305f\\u3002"):console.log("\\u30c7\\u30d0\\u30a4\\u30b9\\u3092\\u518d\\u521d\\u671f\\u5316\\u3057\\u307e\\u3059...")});var k=Y.getContext("webgpu");Y.width=Z[0];Y.height=Z[1];var d=navigator.gpu.getPreferredCanvasFormat();k.configure({device:C,format:d,alphaMode:"premultiplied"});c=C.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX,buffer:{type:"uniform"}},\n{binding:1,visibility:GPUShaderStage.VERTEX,buffer:{type:"uniform",hasDynamicOffset:!0}}]});var e=C.createShaderModule({code:"struct PrimitiveVertex{@location(0)pos:vec2i,@location(1)style_id:i32,}struct PolylineVertex{@location(0)pos:vec2i,@location(1)style_id:i32,@location(2)pad:i32,@location(3)normal:vec2f,}struct Style{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct ClampTable{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,pad0:f32,pad1:f32,pad2:f32,clamps:array<ClampTable,6>,padvec1:vec4f,styles:array<Style,12>}struct Transform{matrix:mat3x2f,tile_opacity:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<uniform> transform:Transform;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.clamps[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:PrimitiveVertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:PolylineVertex,)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-5){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.clamps[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(input.normal);let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.style_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.normal)<0.5&&length(input.pos)>0&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}@vertex fn vs_mask(@builtin(vertex_index)vertexIndex:u32)->VertexOutput{var out:VertexOutput;var local_pos=vec2<f32>(0.0,0.0);if(vertexIndex==1u){local_pos=vec2<f32>(4096.0,0.0);}if(vertexIndex==2u){local_pos=vec2<f32>(0.0,4096.0);}if(vertexIndex==3u){local_pos=vec2<f32>(4096.0,4096.0);}out.position=vec4f(transform.matrix*vec3<f32>(local_pos,1.0),1.0,1.0);return out;}@fragment fn fs_dummy()->@location(0)vec4<f32>{return vec4<f32>(0.0);}"}),\nf=Pa(c,d,e,"vs_mask",0,[],"triangle-strip","fs_dummy",!0,{compare:"always",passOp:"replace"}),g=Pa(c,d,e,"vs_polygon",16,[[0,"sint32x2"],[8,"sint32"]],"triangle-list"),l=Pa(c,d,e,"vs_thinline",16,[[0,"sint32x2"],[8,"sint32"]],"line-list"),m=Pa(c,d,e,"vs_polyline",32,[[0,"sint32x2"],[8,"sint32"],[12,"sint32"],[16,"float32x2"]],"triangle-list","fs_polyline");d=await e.getCompilationInfo();for(var n of d.messages)console.error(`WGSL error: ${n.message} at line ${n.lineNum}`);Qa=C.createBuffer({size:512,\nusage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});var q=C.createBuffer({size:12800,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});n=[];d=[];for(e=Na.length;e--;){let x=Na[e];if(/p|s/.test(x.l))continue;x.ca=~~(d.length/8);let H=x.B||1,v=x.G||1;Array.isArray(H)&&(n.push(...H.flat()),H=-(~~n.length/4));Array.isArray(v)&&(n.push(...v.flat()),v=-(~~n.length/4));let w=x.l=="f"?[0,0,0]:x.u;d.push(...(x.l=="l"?[1,1,1]:x.u),v,...w,H)}C.queue.writeBuffer(Qa,16,new Float32Array(n));C.queue.writeBuffer(Qa,\n128,new Float32Array(d));var p=C.createBindGroup({layout:c,entries:[{binding:0,resource:{buffer:Qa}},{binding:1,resource:{buffer:q,size:32}}]}),r=[];c=[[15,28191,13180],[15,28192,13180],[15,28191,13179],[15,28192,13179]];for(let x of c)c=await Oa(x),c=aa(c,x),r.push(c);Ya();b()}else Ma("e","WebGPU \\u3092\\u30b5\\u30dd\\u30fc\\u30c8\\u3057\\u3066\\u3044\\u306a\\u3044\\u30d6\\u30e9\\u30a6\\u30b6\\u3001\\u307e\\u305f\\u306f\\u74b0\\u5883\\u3067\\u3059\\u3002")}\nfunction Za(a,b,c,k,d,e,f,g,l){f=Wa*Math.pow(2,f-Ta);g=f/g*2;l=f/l*2;a-=Ta;f=1/Math.pow(2,a);return new Float32Array([f/k*g,0,0,-(f/k)*l,((b-Ua*Math.pow(2,a))*f-d)*g,-((c-Va*Math.pow(2,a))*f-e)*l])}function Ya(){var a=Z;Ra=C.createTexture({size:a,sampleCount:4,format:navigator.gpu.getPreferredCanvasFormat(),usage:GPUTextureUsage.RENDER_ATTACHMENT});Sa=C.createTexture({size:a,sampleCount:4,format:"depth24plus-stencil8",usage:GPUTextureUsage.RENDER_ATTACHMENT})};//# sourceMappingURL=/worker.map\n'], { type: "application/javascript" });
+var blob = new Blob([`// src/js/shader.wgsl
+var shader_default = \`struct Vertex{@location(0)pos:vec2i,@location(1)style_id:i32,@location(2)normal:vec2i,}struct Style{fillColor:vec3f,opacity:f32,lineColor:vec3f,thickness:f32,}struct ClampTable{min_zoom:f32,min_val:f32,max_zoom:f32,max_val:f32,};struct Uniforms{zoom:f32,pad0:f32,pad1:f32,pad2:f32,clamps:array<ClampTable,6>,padvec1:vec4f,styles:array<Style,12>}struct Transform{matrix:mat3x2f,tile_opacity:f32,}@group(0)@binding(0)var<uniform> uniforms:Uniforms;@group(0)@binding(1)var<uniform> transform:Transform;struct VertexOutput{@builtin(position)position:vec4f,@location(0)color:vec4f,@location(1)normal:vec2f,@location(2)pos:vec2f,}fn sheer(color:vec3f,o:f32)->vec4f{var opacity=o;if(opacity<0){let style=uniforms.clamps[u32(-opacity-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);opacity=mix(style.min_val,style.max_val,t);}return vec4f(color,opacity);}@vertex fn vs_polygon(input:Vertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.fillColor,prop.opacity);return output;}@vertex fn vs_thinline(input:Vertex)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var z=f32(input.style_id+1)*1e-6+1e-7;output.position=vec4f(cam_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);return output;}@vertex fn vs_polyline(input:Vertex,)->VertexOutput{var output:VertexOutput;let prop=uniforms.styles[input.style_id];let cam_pos=transform.matrix*vec3f(vec2f(input.pos),1.0);var thickness=prop.thickness;if(thickness==-5){output.pos=vec2f(input.pos);}else{output.pos=vec2f(0,0);}if(thickness<0){let style=uniforms.clamps[u32(-thickness-1)];let t=clamp((uniforms.zoom-style.min_zoom)/(style.max_zoom-style.min_zoom),0.0,1.0);thickness=mix(style.min_val,style.max_val,t);}let normal=normalize(vec2f(input.normal));let thickness_ndc=thickness/512.0;let offset=vec2f(normal.x*thickness_ndc*0.5,normal.y*thickness_ndc*0.5);let final_pos=cam_pos+offset;var z=f32(input.style_id+1)*1e-6;output.position=vec4f(final_pos,z,1.0);output.color=sheer(prop.lineColor,prop.opacity);output.normal=normal;return output;}@fragment fn fs_main(input:VertexOutput)->@location(0)vec4f{return input.color;}@fragment fn fs_polyline(input:VertexOutput)->@location(0)vec4f{if(length(input.normal)<0.5&&length(input.pos)>0&&((input.pos.y+1)/30)% 2>0.5){discard;}return input.color;}@vertex fn vs_mask(@builtin(vertex_index)vertexIndex:u32)->VertexOutput{var out:VertexOutput;var local_pos=vec2<f32>(0.0,0.0);if(vertexIndex==1u){local_pos=vec2<f32>(4096.0,0.0);}if(vertexIndex==2u){local_pos=vec2<f32>(0.0,4096.0);}if(vertexIndex==3u){local_pos=vec2<f32>(4096.0,4096.0);}out.position=vec4f(transform.matrix*vec3<f32>(local_pos,1.0),1.0,1.0);return out;}@fragment fn fs_dummy()->@location(0)vec4<f32>{return vec4<f32>(0.0);}\`;
+
+// src/js/onCreateTile.js
+function onCreateTile(device2, tileData, zxy) {
+  const prepareIndexData = (data) => {
+    if (data.length % 2 != 0) {
+      const last = data[data.length - 1];
+      data.push(last);
+    }
+  };
+  const polygonVertexBuffer = device2.createBuffer({
+    size: tileData.polygonVertex.length * 2,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
+  const polygonVertexData = new Int16Array(tileData.polygonVertex);
+  device2.queue.writeBuffer(polygonVertexBuffer, 0, polygonVertexData);
+  prepareIndexData(tileData.polygonIndex);
+  const polygonIndexBuffer = device2.createBuffer({
+    size: tileData.polygonIndex.length * 2,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+  });
+  const polygonIndexData = new Uint16Array(tileData.polygonIndex);
+  device2.queue.writeBuffer(polygonIndexBuffer, 0, polygonIndexData);
+  prepareIndexData(tileData.borderIndex);
+  const borderIndexBuffer = device2.createBuffer({
+    size: tileData.borderIndex.length * 2,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+  });
+  const borderIndexData = new Uint16Array(tileData.borderIndex);
+  device2.queue.writeBuffer(borderIndexBuffer, 0, borderIndexData);
+  const lineVertexBuffer = device2.createBuffer({
+    size: tileData.lineVertex.length * 2,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
+  const lineVertexData = new Uint16Array(tileData.lineVertex);
+  device2.queue.writeBuffer(lineVertexBuffer, 0, lineVertexData);
+  prepareIndexData(tileData.lineIndex);
+  const lineIndexBuffer = device2.createBuffer({
+    size: tileData.lineIndex.length * 2,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+  });
+  const lineIndexData = new Uint16Array(tileData.lineIndex);
+  device2.queue.writeBuffer(lineIndexBuffer, 0, lineIndexData);
+  const thinVertexBuffer = device2.createBuffer({
+    size: tileData.thinVertex.length * 2,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
+  const thinVertexData = new Int16Array(tileData.thinVertex);
+  device2.queue.writeBuffer(thinVertexBuffer, 0, thinVertexData);
+  prepareIndexData(tileData.thinIndex);
+  const thinIndexBuffer = device2.createBuffer({
+    size: tileData.thinIndex.length * 2,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+  });
+  const thinIndexData = new Uint16Array(tileData.thinIndex);
+  device2.queue.writeBuffer(thinIndexBuffer, 0, thinIndexData);
+  return {
+    zxy,
+    polygonVertexBuffer,
+    polygonIndexBuffer,
+    polygonIndexCount: tileData.polygonIndex.length,
+    borderIndexBuffer,
+    borderIndexCount: tileData.borderIndex.length,
+    lineVertexBuffer,
+    lineIndexBuffer,
+    lineIndexCount: tileData.lineIndex.length,
+    thinVertexBuffer,
+    thinIndexBuffer,
+    thinIndexCount: tileData.thinIndex.length
+  };
+}
+
+// src/js/pbf/pointGeo.js
+function Point(x, y) {
+  this.x = x;
+  this.y = y;
+}
+Point.prototype = {
+  /**
+   * Clone this point, returning a new point that can be modified
+   * without affecting the old one.
+   * @return {Point} the clone
+   */
+  clone() {
+    return new Point(this.x, this.y);
+  },
+  /**
+   * Add this point's x & y coordinates to another point,
+   * yielding a new point.
+   * @param {Point} p the other point
+   * @return {Point} output point
+   */
+  add(p) {
+    return this.clone()._add(p);
+  },
+  /**
+   * Subtract this point's x & y coordinates to from point,
+   * yielding a new point.
+   * @param {Point} p the other point
+   * @return {Point} output point
+   */
+  sub(p) {
+    return this.clone()._sub(p);
+  },
+  /**
+   * Multiply this point's x & y coordinates by point,
+   * yielding a new point.
+   * @param {Point} p the other point
+   * @return {Point} output point
+   */
+  multByPoint(p) {
+    return this.clone()._multByPoint(p);
+  },
+  /**
+   * Divide this point's x & y coordinates by point,
+   * yielding a new point.
+   * @param {Point} p the other point
+   * @return {Point} output point
+   */
+  divByPoint(p) {
+    return this.clone()._divByPoint(p);
+  },
+  /**
+   * Multiply this point's x & y coordinates by a factor,
+   * yielding a new point.
+   * @param {number} k factor
+   * @return {Point} output point
+   */
+  mult(k) {
+    return this.clone()._mult(k);
+  },
+  /**
+   * Divide this point's x & y coordinates by a factor,
+   * yielding a new point.
+   * @param {number} k factor
+   * @return {Point} output point
+   */
+  div(k) {
+    return this.clone()._div(k);
+  },
+  /**
+   * Rotate this point around the 0, 0 origin by an angle a,
+   * given in radians
+   * @param {number} a angle to rotate around, in radians
+   * @return {Point} output point
+   */
+  rotate(a) {
+    return this.clone()._rotate(a);
+  },
+  /**
+   * Rotate this point around p point by an angle a,
+   * given in radians
+   * @param {number} a angle to rotate around, in radians
+   * @param {Point} p Point to rotate around
+   * @return {Point} output point
+   */
+  rotateAround(a, p) {
+    return this.clone()._rotateAround(a, p);
+  },
+  /**
+   * Multiply this point by a 4x1 transformation matrix
+   * @param {[number, number, number, number]} m transformation matrix
+   * @return {Point} output point
+   */
+  matMult(m) {
+    return this.clone()._matMult(m);
+  },
+  /**
+   * Calculate this point but as a unit vector from 0, 0, meaning
+   * that the distance from the resulting point to the 0, 0
+   * coordinate will be equal to 1 and the angle from the resulting
+   * point to the 0, 0 coordinate will be the same as before.
+   * @return {Point} unit vector point
+   */
+  unit() {
+    return this.clone()._unit();
+  },
+  /**
+   * Compute a perpendicular point, where the new y coordinate
+   * is the old x coordinate and the new x coordinate is the old y
+   * coordinate multiplied by -1
+   * @return {Point} perpendicular point
+   */
+  perp() {
+    return this.clone()._perp();
+  },
+  /**
+   * Return a version of this point with the x & y coordinates
+   * rounded to integers.
+   * @return {Point} rounded point
+   */
+  round() {
+    return this.clone()._round();
+  },
+  /**
+   * Return the magnitude of this point: this is the Euclidean
+   * distance from the 0, 0 coordinate to this point's x and y
+   * coordinates.
+   * @return {number} magnitude
+   */
+  mag() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  },
+  /**
+   * Judge whether this point is equal to another point, returning
+   * true or false.
+   * @param {Point} other the other point
+   * @return {boolean} whether the points are equal
+   */
+  equals(other) {
+    return this.x === other.x && this.y === other.y;
+  },
+  /**
+   * Calculate the distance from this point to another point
+   * @param {Point} p the other point
+   * @return {number} distance
+   */
+  dist(p) {
+    return Math.sqrt(this.distSqr(p));
+  },
+  /**
+   * Calculate the distance from this point to another point,
+   * without the square root step. Useful if you're comparing
+   * relative distances.
+   * @param {Point} p the other point
+   * @return {number} distance
+   */
+  distSqr(p) {
+    const dx = p.x - this.x, dy = p.y - this.y;
+    return dx * dx + dy * dy;
+  },
+  /**
+   * Get the angle from the 0, 0 coordinate to this point, in radians
+   * coordinates.
+   * @return {number} angle
+   */
+  angle() {
+    return Math.atan2(this.y, this.x);
+  },
+  /**
+   * Get the angle from this point to another point, in radians
+   * @param {Point} b the other point
+   * @return {number} angle
+   */
+  angleTo(b) {
+    return Math.atan2(this.y - b.y, this.x - b.x);
+  },
+  /**
+   * Get the angle between this point and another point, in radians
+   * @param {Point} b the other point
+   * @return {number} angle
+   */
+  angleWith(b) {
+    return this.angleWithSep(b.x, b.y);
+  },
+  /**
+   * Find the angle of the two vectors, solving the formula for
+   * the cross product a x b = |a||b|sin(\u03B8) for \u03B8.
+   * @param {number} x the x-coordinate
+   * @param {number} y the y-coordinate
+   * @return {number} the angle in radians
+   */
+  angleWithSep(x, y) {
+    return Math.atan2(this.x * y - this.y * x, this.x * x + this.y * y);
+  },
+  /** @param {[number, number, number, number]} m */
+  _matMult(m) {
+    const x = m[0] * this.x + m[1] * this.y, y = m[2] * this.x + m[3] * this.y;
+    this.x = x;
+    this.y = y;
+    return this;
+  },
+  /** @param {Point} p */
+  _add(p) {
+    this.x += p.x;
+    this.y += p.y;
+    return this;
+  },
+  /** @param {Point} p */
+  _sub(p) {
+    this.x -= p.x;
+    this.y -= p.y;
+    return this;
+  },
+  /** @param {number} k */
+  _mult(k) {
+    this.x *= k;
+    this.y *= k;
+    return this;
+  },
+  /** @param {number} k */
+  _div(k) {
+    this.x /= k;
+    this.y /= k;
+    return this;
+  },
+  /** @param {Point} p */
+  _multByPoint(p) {
+    this.x *= p.x;
+    this.y *= p.y;
+    return this;
+  },
+  /** @param {Point} p */
+  _divByPoint(p) {
+    this.x /= p.x;
+    this.y /= p.y;
+    return this;
+  },
+  _unit() {
+    this._div(this.mag());
+    return this;
+  },
+  _perp() {
+    const y = this.y;
+    this.y = this.x;
+    this.x = -y;
+    return this;
+  },
+  /** @param {number} angle */
+  _rotate(angle) {
+    const cos = Math.cos(angle), sin = Math.sin(angle), x = cos * this.x - sin * this.y, y = sin * this.x + cos * this.y;
+    this.x = x;
+    this.y = y;
+    return this;
+  },
+  /**
+   * @param {number} angle
+   * @param {Point} p
+   */
+  _rotateAround(angle, p) {
+    const cos = Math.cos(angle), sin = Math.sin(angle), x = p.x + cos * (this.x - p.x) - sin * (this.y - p.y), y = p.y + sin * (this.x - p.x) + cos * (this.y - p.y);
+    this.x = x;
+    this.y = y;
+    return this;
+  },
+  _round() {
+    this.x = Math.round(this.x);
+    this.y = Math.round(this.y);
+    return this;
+  },
+  constructor: Point
+};
+Point.convert = function(p) {
+  if (p instanceof Point) {
+    return (
+      /** @type {Point} */
+      p
+    );
+  }
+  if (Array.isArray(p)) {
+    return new Point(+p[0], +p[1]);
+  }
+  if (p.x !== void 0 && p.y !== void 0) {
+    return new Point(+p.x, +p.y);
+  }
+  throw new Error("Expected [x, y] or {x, y} point format");
+};
+
+// src/js/pbf/vectortile.js
+var VectorTileFeature = class {
+  /**
+   * @param {PbfReader} pbf
+   * @param {number} end
+   * @param {number} extent
+   * @param {string[]} keys
+   * @param {(number | string | boolean)[]} values
+   */
+  constructor(pbf, end, extent, keys, values) {
+    this.properties = /* @__PURE__ */ Object.create(null);
+    this.extent = extent;
+    this.type = 0;
+    this.id = void 0;
+    this._pbf = pbf;
+    this._geometry = -1;
+    this._keys = keys;
+    this._values = values;
+    while (pbf.pos < end) {
+      const tag = pbf.readVarint();
+      if (tag === 8) this.id = pbf.readVarint();
+      else if (tag === 18) {
+        const tagsEnd = pbf.readVarint() + pbf.pos;
+        while (pbf.pos < tagsEnd) {
+          const key = keys[pbf.readVarint()];
+          const value = values[pbf.readVarint()];
+          this.properties[key] = value;
+        }
+      } else if (tag === 24)
+        this.type = /** @type {0 | 1 | 2 | 3} */
+        pbf.readVarint();
+      else if (tag === 34) {
+        this._geometry = pbf.pos;
+        pbf.skip(tag);
+      } else pbf.skip(tag);
+    }
+  }
+  loadGeometry() {
+    if (this._geometry < 0) {
+      console.log("feature has no geometry");
+      return;
+    }
+    const pbf = this._pbf;
+    pbf.pos = this._geometry;
+    const end = pbf.readVarint() + pbf.pos;
+    const lines = [];
+    let line;
+    let cmd = 1;
+    let length = 0;
+    let x = 0;
+    let y = 0;
+    while (pbf.pos < end) {
+      if (length <= 0) {
+        const cmdLen = pbf.readVarint();
+        cmd = cmdLen & 7;
+        length = cmdLen >> 3;
+        if (length === 0) continue;
+      }
+      length--;
+      if (cmd === 1) {
+        x += pbf.readSVarint();
+        y += pbf.readSVarint();
+        if (line) lines.push(line);
+        line = [new Point(x, y)];
+      } else if (cmd === 2) {
+        x += pbf.readSVarint();
+        y += pbf.readSVarint();
+        if (line) line.push(new Point(x, y));
+      } else if (cmd === 7) {
+        if (line) {
+          line.push(line[0].clone());
+        }
+      } else {
+        console.log(\`unknown command \${cmd}\`);
+        return;
+      }
+    }
+    if (line) lines.push(line);
+    return {
+      lines,
+      properties: this.properties
+    };
+  }
+  bbox() {
+    if (this._geometry < 0) {
+      console.log("feature has no geometry");
+      return;
+    }
+    const pbf = this._pbf;
+    pbf.pos = this._geometry;
+    const end = pbf.readVarint() + pbf.pos;
+    let cmd = 1, length = 0, x = 0, y = 0, x1 = Infinity, x2 = -Infinity, y1 = Infinity, y2 = -Infinity;
+    while (pbf.pos < end) {
+      if (length <= 0) {
+        const cmdLen = pbf.readVarint();
+        cmd = cmdLen & 7;
+        length = cmdLen >> 3;
+        if (length === 0) continue;
+      }
+      length--;
+      if (cmd === 1 || cmd === 2) {
+        x += pbf.readSVarint();
+        y += pbf.readSVarint();
+        if (x < x1) x1 = x;
+        if (x > x2) x2 = x;
+        if (y < y1) y1 = y;
+        if (y > y2) y2 = y;
+      } else if (cmd !== 7) {
+        console.log(\`unknown command \${cmd}\`);
+        return;
+      }
+    }
+    return [x1, y1, x2, y2];
+  }
+  /**
+   * @param {number} x
+   * @param {number} y
+   * @param {number} z
+   * @return {Feature}
+   */
+  toGeoJSON(x, y, z) {
+    const size2 = this.extent * Math.pow(2, z), x0 = this.extent * x, y0 = this.extent * y, vtCoords = this.loadGeometry();
+    function projectPoint(p) {
+      return [
+        (p.x + x0) * 360 / size2 - 180,
+        360 / Math.PI * Math.atan(Math.exp((1 - (p.y + y0) * 2 / size2) * Math.PI)) - 90
+      ];
+    }
+    function projectLine(line) {
+      return line.map(projectPoint);
+    }
+    let geometry;
+    if (this.type === 1) {
+      const points = [];
+      for (const line of vtCoords) {
+        points.push(line[0]);
+      }
+      const coordinates = projectLine(points);
+      geometry = points.length === 1 ? { type: "Point", coordinates: coordinates[0] } : { type: "MultiPoint", coordinates };
+    } else if (this.type === 2) {
+      const coordinates = vtCoords.map(projectLine);
+      geometry = coordinates.length === 1 ? { type: "LineString", coordinates: coordinates[0] } : { type: "MultiLineString", coordinates };
+    } else if (this.type === 3) {
+      const polygons = classifyRings(vtCoords);
+      const coordinates = [];
+      for (const polygon of polygons) {
+        coordinates.push(polygon.map(projectLine));
+      }
+      geometry = coordinates.length === 1 ? { type: "Polygon", coordinates: coordinates[0] } : { type: "MultiPolygon", coordinates };
+    } else {
+      console.log("unknown feature type");
+      return;
+    }
+    const result = {
+      type: "Feature",
+      geometry,
+      properties: this.properties
+    };
+    if (this.id != null) {
+      result.id = this.id;
+    }
+    return result;
+  }
+};
+VectorTileFeature.types = ["Unknown", "Point", "LineString", "Polygon"];
+function classifyRings(rings) {
+  const len = rings.length;
+  if (len <= 1) return [rings];
+  const polygons = [];
+  let polygon, ccw;
+  for (let i = 0; i < len; i++) {
+    const area2 = signedArea(rings[i]);
+    if (area2 === 0) continue;
+    if (ccw === void 0) ccw = area2 < 0;
+    if (ccw === area2 < 0) {
+      if (polygon) polygons.push(polygon);
+      polygon = [rings[i]];
+    } else if (polygon) {
+      polygon.push(rings[i]);
+    }
+  }
+  if (polygon) polygons.push(polygon);
+  return polygons;
+}
+function signedArea(ring) {
+  let sum = 0;
+  for (let i = 0, len = ring.length, j = len - 1, p1, p2; i < len; j = i++) {
+    p1 = ring[i];
+    p2 = ring[j];
+    sum += (p2.x - p1.x) * (p1.y + p2.y);
+  }
+  return sum;
+}
+var VectorTileLayer = class {
+  /**
+   * @param {PbfReader} pbf
+   * @param {number} [end]
+   */
+  constructor(pbf, end) {
+    this.version = 1;
+    this.name = "";
+    this.extent = 4096;
+    this.length = 0;
+    this._pbf = pbf;
+    this._keys = [];
+    this._values = [];
+    this._features = [];
+    if (end === void 0) end = pbf.length;
+    while (pbf.pos < end) {
+      const tag = pbf.readVarint();
+      if (tag === 10) this.name = pbf.readString();
+      else if (tag === 18) {
+        this._features.push(pbf.pos);
+        pbf.skip(tag);
+      } else if (tag === 26) this._keys.push(pbf.readString());
+      else if (tag === 34) this._values.push(readValueMessage(pbf));
+      else if (tag === 40) this.extent = pbf.readVarint();
+      else if (tag === 120) this.version = pbf.readVarint();
+      else pbf.skip(tag);
+    }
+    this.length = this._features.length;
+  }
+  /** return feature \`i\` from this layer as a \`VectorTileFeature\`
+   * @param {number} i
+   */
+  feature(i) {
+    if (i < 0 || i >= this._features.length) {
+      console.log("feature index out of bounds");
+      return;
+    }
+    this._pbf.pos = this._features[i];
+    const end = this._pbf.readVarint() + this._pbf.pos;
+    return new VectorTileFeature(
+      this._pbf,
+      end,
+      this.extent,
+      this._keys,
+      this._values
+    );
+  }
+};
+function readValueMessage(pbf) {
+  let value = null;
+  const end = pbf.readVarint() + pbf.pos;
+  while (pbf.pos < end) {
+    const tag = pbf.readVarint();
+    value = tag === 10 ? pbf.readString() : tag === 21 ? pbf.readFloat() : tag === 25 ? pbf.readDouble() : tag === 32 ? pbf.readVarint(true) : tag === 40 ? pbf.readVarint() : tag === 48 ? pbf.readSVarint() : tag === 56 ? pbf.readBoolean() : (pbf.skip(tag), null);
+  }
+  if (value == null) {
+    console.log("unknown feature value");
+    return;
+  }
+  return value;
+}
+var VectorTile = class {
+  /**
+   * @param {PbfReader} pbf
+   * @param {number} [end]
+   */
+  constructor(pbf, end = pbf.length) {
+    const layers = /* @__PURE__ */ Object.create(null);
+    while (pbf.pos < end) {
+      const tag = pbf.readVarint();
+      if (tag === 26) {
+        const layer = new VectorTileLayer(pbf, pbf.readVarint() + pbf.pos);
+        if (layer.length) layers[layer.name] = layer;
+      } else pbf.skip(tag);
+    }
+    this.layers = layers;
+  }
+};
+
+// src/js/pbf/ieee754.js
+var read = (buffer, offset, isLE, mLen, nBytes) => {
+  var e, m;
+  var eLen = nBytes * 8 - mLen - 1;
+  var eMax = (1 << eLen) - 1;
+  var eBias = eMax >> 1;
+  var nBits = -7;
+  var i = isLE ? nBytes - 1 : 0;
+  var d = isLE ? -1 : 1;
+  var s = buffer[offset + i];
+  i += d;
+  e = s & (1 << -nBits) - 1;
+  s >>= -nBits;
+  nBits += eLen;
+  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8) {
+  }
+  m = e & (1 << -nBits) - 1;
+  e >>= -nBits;
+  nBits += mLen;
+  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8) {
+  }
+  if (e === 0) {
+    e = 1 - eBias;
+  } else if (e === eMax) {
+    return m ? NaN : (s ? -1 : 1) * Infinity;
+  } else {
+    m = m + Math.pow(2, mLen);
+    e = e - eBias;
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen);
+};
+
+// src/js/pbf/pbf.js
+function Pbf(buf) {
+  this.buf = ArrayBuffer.isView && ArrayBuffer.isView(buf) ? buf : new Uint8Array(buf || 0);
+  this.pos = 0;
+  this.type = 0;
+  this.length = this.buf.length;
+}
+Pbf.Varint = 0;
+Pbf.Fixed64 = 1;
+Pbf.Bytes = 2;
+Pbf.Fixed32 = 5;
+var SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
+var SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
+Pbf.prototype = {
+  destroy: function() {
+    this.buf = null;
+  },
+  // === READING =================================================================
+  readFields: function(readField, result, end) {
+    end = end || this.length;
+    while (this.pos < end) {
+      var val = this.readVarint(), tag = val >> 3, startPos = this.pos;
+      this.type = val & 7;
+      readField(tag, result, this);
+      if (this.pos === startPos) this.skip(val);
+    }
+    return result;
+  },
+  readMessage: function(readField, result) {
+    return this.readFields(readField, result, this.readVarint() + this.pos);
+  },
+  readFixed32: function() {
+    var val = readUInt32(this.buf, this.pos);
+    this.pos += 4;
+    return val;
+  },
+  readSFixed32: function() {
+    var val = readInt32(this.buf, this.pos);
+    this.pos += 4;
+    return val;
+  },
+  // 64-bit int handling is based on github.com/dpw/node-buffer-more-ints (MIT-licensed)
+  readFixed64: function() {
+    var val = readUInt32(this.buf, this.pos) + readUInt32(this.buf, this.pos + 4) * SHIFT_LEFT_32;
+    this.pos += 8;
+    return val;
+  },
+  readSFixed64: function() {
+    var val = readUInt32(this.buf, this.pos) + readInt32(this.buf, this.pos + 4) * SHIFT_LEFT_32;
+    this.pos += 8;
+    return val;
+  },
+  readFloat: function() {
+    var val = read(this.buf, this.pos, true, 23, 4);
+    this.pos += 4;
+    return val;
+  },
+  readDouble: function() {
+    var val = read(this.buf, this.pos, true, 52, 8);
+    this.pos += 8;
+    return val;
+  },
+  readVarint: function(isSigned) {
+    var buf = this.buf, val, b;
+    b = buf[this.pos++];
+    val = b & 127;
+    if (b < 128) return val;
+    b = buf[this.pos++];
+    val |= (b & 127) << 7;
+    if (b < 128) return val;
+    b = buf[this.pos++];
+    val |= (b & 127) << 14;
+    if (b < 128) return val;
+    b = buf[this.pos++];
+    val |= (b & 127) << 21;
+    if (b < 128) return val;
+    b = buf[this.pos];
+    val |= (b & 15) << 28;
+    return readVarintRemainder(val, isSigned, this);
+  },
+  readVarint64: function() {
+    return this.readVarint(true);
+  },
+  readSVarint: function() {
+    var num = this.readVarint();
+    return num % 2 === 1 ? (num + 1) / -2 : num / 2;
+  },
+  readBoolean: function() {
+    return Boolean(this.readVarint());
+  },
+  readString: function() {
+    var end = this.readVarint() + this.pos, str = readUtf8(this.buf, this.pos, end);
+    this.pos = end;
+    return str;
+  },
+  readBytes: function() {
+    var end = this.readVarint() + this.pos, buffer = this.buf.subarray(this.pos, end);
+    this.pos = end;
+    return buffer;
+  },
+  // verbose for performance reasons; doesn't affect gzipped size
+  readPackedVarint: function(arr, isSigned) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readVarint(isSigned));
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readVarint(isSigned));
+    return arr;
+  },
+  readPackedSVarint: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readSVarint());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readSVarint());
+    return arr;
+  },
+  readPackedBoolean: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readBoolean());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readBoolean());
+    return arr;
+  },
+  readPackedFloat: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readFloat());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readFloat());
+    return arr;
+  },
+  readPackedDouble: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readDouble());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readDouble());
+    return arr;
+  },
+  readPackedFixed32: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readFixed32());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readFixed32());
+    return arr;
+  },
+  readPackedSFixed32: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readSFixed32());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readSFixed32());
+    return arr;
+  },
+  readPackedFixed64: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readFixed64());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readFixed64());
+    return arr;
+  },
+  readPackedSFixed64: function(arr) {
+    if (this.type !== Pbf.Bytes) return arr.push(this.readSFixed64());
+    var end = readPackedEnd(this);
+    arr = arr || [];
+    while (this.pos < end) arr.push(this.readSFixed64());
+    return arr;
+  },
+  skip: function(val) {
+    var type = val & 7;
+    if (type === Pbf.Varint) while (this.buf[this.pos++] > 127) {
+    }
+    else if (type === Pbf.Bytes) this.pos = this.readVarint() + this.pos;
+    else if (type === Pbf.Fixed32) this.pos += 4;
+    else if (type === Pbf.Fixed64) this.pos += 8;
+    else console.log("Unimplemented type: " + type);
+  }
+};
+var readVarintRemainder = (l, s, p) => {
+  var buf = p.buf, h, b;
+  b = buf[p.pos++];
+  h = (b & 112) >> 4;
+  if (b < 128) return toNum(l, h, s);
+  b = buf[p.pos++];
+  h |= (b & 127) << 3;
+  if (b < 128) return toNum(l, h, s);
+  b = buf[p.pos++];
+  h |= (b & 127) << 10;
+  if (b < 128) return toNum(l, h, s);
+  b = buf[p.pos++];
+  h |= (b & 127) << 17;
+  if (b < 128) return toNum(l, h, s);
+  b = buf[p.pos++];
+  h |= (b & 127) << 24;
+  if (b < 128) return toNum(l, h, s);
+  b = buf[p.pos++];
+  h |= (b & 1) << 31;
+  if (b < 128) return toNum(l, h, s);
+  console.log("Expected varint not more than 10 bytes");
+};
+var readPackedEnd = (pbf) => {
+  return pbf.type === Pbf.Bytes ? pbf.readVarint() + pbf.pos : pbf.pos + 1;
+};
+var toNum = (low, high, isSigned) => {
+  if (isSigned) {
+    return high * 4294967296 + (low >>> 0);
+  }
+  return (high >>> 0) * 4294967296 + (low >>> 0);
+};
+var readUInt32 = (buf, pos) => {
+  return (buf[pos] | buf[pos + 1] << 8 | buf[pos + 2] << 16) + buf[pos + 3] * 16777216;
+};
+var readInt32 = (buf, pos) => {
+  return (buf[pos] | buf[pos + 1] << 8 | buf[pos + 2] << 16) + (buf[pos + 3] << 24);
+};
+var readUtf8 = (buf, pos, end) => {
+  var str = "";
+  var i = pos;
+  while (i < end) {
+    var b0 = buf[i];
+    var c = null;
+    var bytesPerSequence = b0 > 239 ? 4 : b0 > 223 ? 3 : b0 > 191 ? 2 : 1;
+    if (i + bytesPerSequence > end) break;
+    var b1, b2, b3;
+    if (bytesPerSequence === 1) {
+      if (b0 < 128) {
+        c = b0;
+      }
+    } else if (bytesPerSequence === 2) {
+      b1 = buf[i + 1];
+      if ((b1 & 192) === 128) {
+        c = (b0 & 31) << 6 | b1 & 63;
+        if (c <= 127) {
+          c = null;
+        }
+      }
+    } else if (bytesPerSequence === 3) {
+      b1 = buf[i + 1];
+      b2 = buf[i + 2];
+      if ((b1 & 192) === 128 && (b2 & 192) === 128) {
+        c = (b0 & 15) << 12 | (b1 & 63) << 6 | b2 & 63;
+        if (c <= 2047 || c >= 55296 && c <= 57343) {
+          c = null;
+        }
+      }
+    } else if (bytesPerSequence === 4) {
+      b1 = buf[i + 1];
+      b2 = buf[i + 2];
+      b3 = buf[i + 3];
+      if ((b1 & 192) === 128 && (b2 & 192) === 128 && (b3 & 192) === 128) {
+        c = (b0 & 15) << 18 | (b1 & 63) << 12 | (b2 & 63) << 6 | b3 & 63;
+        if (c <= 65535 || c >= 1114112) {
+          c = null;
+        }
+      }
+    }
+    if (c === null) {
+      c = 65533;
+      bytesPerSequence = 1;
+    } else if (c > 65535) {
+      c -= 65536;
+      str += String.fromCharCode(c >>> 10 & 1023 | 55296);
+      c = 56320 | c & 1023;
+    }
+    str += String.fromCharCode(c);
+    i += bytesPerSequence;
+  }
+  return str;
+};
+
+// src/js/util/earcut.dev.js
+var steiners = /* @__PURE__ */ new Set();
+var filteredOut = false;
+function earcut(data, holeIndices, dim = 2) {
+  const hasHoles = holeIndices && holeIndices.length;
+  const outerLen = hasHoles ? holeIndices[0] * dim : data.length;
+  if (steiners.size) steiners.clear();
+  let outerNode = linkedList(data, 0, outerLen, dim, true);
+  const triangles = [];
+  if (!outerNode || outerNode.next === outerNode.prev) return triangles;
+  let minX = 0, minY = 0, invSize = 0;
+  if (hasHoles) outerNode = eliminateHoles(data, holeIndices, outerNode, dim);
+  if (data.length > 80 * dim) {
+    minX = data[0];
+    minY = data[1];
+    let maxX = minX;
+    let maxY = minY;
+    for (let i = dim; i < outerLen; i += dim) {
+      const x = data[i];
+      const y = data[i + 1];
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    invSize = Math.max(maxX - minX, maxY - minY);
+    invSize = invSize !== 0 ? 32767 / invSize : 0;
+  }
+  earcutLinked(outerNode, triangles, minX, minY, invSize);
+  return triangles;
+}
+function linkedList(data, start, end, dim, clockwise) {
+  let last = null;
+  if (clockwise === signedArea2(data, start, end, dim) > 0) {
+    for (let i = start; i < end; i += dim)
+      last = insertNode(i / dim | 0, data[i], data[i + 1], last);
+  } else {
+    for (let i = end - dim; i >= start; i -= dim)
+      last = insertNode(i / dim | 0, data[i], data[i + 1], last);
+  }
+  if (last && equals(last, last.next)) {
+    removeNode(last);
+    last = last.next;
+  }
+  return last;
+}
+function filterPoints(start, end = start) {
+  const full = end === start;
+  let p = start, again;
+  do {
+    again = false;
+    if (p !== p.next && (steiners.size === 0 || !steiners.has(p)) && (equals(p, p.next) || area(p.prev, p, p.next) === 0)) {
+      if (full || p === end) end = p.prev;
+      filteredOut = true;
+      removeNode(p);
+      p = p.prev;
+      again = true;
+    } else if (full || p !== end) {
+      p = p.next;
+      again = !full;
+    }
+  } while (again || p !== end);
+  return end;
+}
+function earcutLinked(ear, triangles, minX, minY, invSize) {
+  if (invSize) indexCurve(ear, minX, minY, invSize);
+  let stop = ear, cured = false;
+  while (ear.prev !== ear.next) {
+    const prev = ear.prev;
+    const next = ear.next;
+    if (area(prev, ear, next) < 0 && (invSize ? isEarHashed(ear, minX, minY, invSize) : isEar(ear))) {
+      triangles.push(prev.i, ear.i, next.i);
+      removeNode(ear);
+      ear = next;
+      stop = next;
+      continue;
+    }
+    ear = next;
+    if (ear === stop) {
+      filteredOut = false;
+      ear = filterPoints(ear);
+      if (filteredOut) {
+        stop = ear;
+        continue;
+      }
+      if (!cured) {
+        ear = cureLocalIntersections(ear, triangles);
+        stop = ear;
+        cured = true;
+        continue;
+      }
+      splitEarcut(ear, triangles, minX, minY, invSize);
+      break;
+    }
+  }
+}
+function isEar(ear) {
+  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy);
+  let p = c.next;
+  while (p !== a) {
+    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
+      return false;
+    p = p.next;
+  }
+  return true;
+}
+function isEarHashed(ear, minX, minY, invSize) {
+  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy), minZ = zOrder(x0, y0, minX, minY, invSize), maxZ = zOrder(x1, y1, minX, minY, invSize);
+  let p = ear.prevZ;
+  while (p && p.z >= minZ) {
+    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p !== c && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
+      return false;
+    p = p.prevZ;
+  }
+  let n = ear.nextZ;
+  while (n && n.z <= maxZ) {
+    if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1 && n !== c && !(ax === n.x && ay === n.y) && pointInTriangle(ax, ay, bx, by, cx, cy, n.x, n.y) && area(n.prev, n, n.next) >= 0)
+      return false;
+    n = n.nextZ;
+  }
+  return true;
+}
+function cureLocalIntersections(start, triangles) {
+  let p = start;
+  let cured = false;
+  do {
+    const a = p.prev, b = p.next.next;
+    if (intersects(a, p, p.next, b, false) && locallyInside(a, b) && locallyInside(b, a)) {
+      triangles.push(a.i, p.i, b.i);
+      removeNode(p);
+      removeNode(p.next);
+      p = start = b;
+      cured = true;
+    }
+    p = p.next;
+  } while (p !== start);
+  return cured ? filterPoints(p) : p;
+}
+function splitEarcut(start, triangles, minX, minY, invSize) {
+  let a = start;
+  do {
+    let b = a.next.next;
+    while (b !== a.prev) {
+      if (a.i !== b.i && isValidDiagonal(a, b)) {
+        let c = splitPolygon(a, b);
+        a = filterPoints(a, a.next);
+        c = filterPoints(c, c.next);
+        earcutLinked(a, triangles, minX, minY, invSize);
+        earcutLinked(c, triangles, minX, minY, invSize);
+        return;
+      }
+      b = b.next;
+    }
+    a = a.next;
+  } while (a !== start);
+}
+var indexActive = false;
+function eliminateHoles(data, holeIndices, outerNode, dim) {
+  const queue = [];
+  for (let i = 0, len = holeIndices.length; i < len; i++) {
+    const start = holeIndices[i] * dim;
+    const end = i < len - 1 ? holeIndices[i + 1] * dim : data.length;
+    const list = (
+      /** @type {Node} */
+      linkedList(data, start, end, dim, false)
+    );
+    if (list === list.next) steiners.add(list);
+    queue.push(getLeftmost(list));
+  }
+  queue.sort(compareXYSlope);
+  buildBlockIndex(data.length / dim, holeIndices.length);
+  indexSegment(outerNode, outerNode);
+  indexActive = true;
+  for (let i = 0; i < queue.length; i++) {
+    outerNode = eliminateHole(queue[i], outerNode);
+  }
+  indexActive = false;
+  return filterPoints(outerNode);
+}
+function compareXYSlope(a, b) {
+  return a.x - b.x || a.y - b.y || (a.next.y - a.y) / (a.next.x - a.x) - (b.next.y - b.y) / (b.next.x - b.x);
+}
+function eliminateHole(hole, outerNode) {
+  const bridge = findHoleBridge(hole, outerNode);
+  if (!bridge) {
+    return outerNode;
+  }
+  const bridgeReverse = splitPolygon(bridge, hole);
+  const bridge2 = bridgeReverse.next;
+  indexSegment(bridge, bridge2.next);
+  filterPoints(bridgeReverse, bridgeReverse.next);
+  return filterPoints(bridge, bridge.next);
+}
+var K = 16;
+var blockBBox = new Float64Array(0);
+var numBlocks = 0;
+var blockHead = [];
+var blockStop = [];
+function buildBlockIndex(maxNodes, numHoles) {
+  const maxBlocks = Math.ceil((maxNodes + 2 * numHoles) / K) + numHoles + 2;
+  if (blockBBox.length < maxBlocks * 4)
+    blockBBox = new Float64Array(maxBlocks * 4);
+  numBlocks = 0;
+}
+function indexSegment(head, stop) {
+  let p = head;
+  do {
+    const b = numBlocks++;
+    blockHead[b] = p;
+    let minX = p.x, minY = p.y, maxX = p.x, maxY = p.y;
+    let k = 0;
+    do {
+      const c = p.next;
+      p.z = b;
+      if (c.x < minX) minX = c.x;
+      if (c.x > maxX) maxX = c.x;
+      if (c.y < minY) minY = c.y;
+      if (c.y > maxY) maxY = c.y;
+      p = c;
+    } while (++k < K && p !== stop);
+    blockStop[b] = p;
+    const g = b * 4;
+    blockBBox[g] = minX;
+    blockBBox[g + 1] = minY;
+    blockBBox[g + 2] = maxX;
+    blockBBox[g + 3] = maxY;
+  } while (p !== stop);
+}
+function growBlock(head, tail) {
+  const g = head.z * 4;
+  if (tail.x < blockBBox[g]) blockBBox[g] = tail.x;
+  if (tail.y < blockBBox[g + 1]) blockBBox[g + 1] = tail.y;
+  if (tail.x > blockBBox[g + 2]) blockBBox[g + 2] = tail.x;
+  if (tail.y > blockBBox[g + 3]) blockBBox[g + 3] = tail.y;
+}
+function liveBlockStop(b) {
+  let stop = blockStop[b];
+  while (stop.prev.next !== stop) stop = stop.next;
+  blockStop[b] = stop;
+  return stop;
+}
+function liveBlockHead(b) {
+  let head = blockHead[b];
+  while (head.prev.next !== head) head = head.next;
+  blockHead[b] = head;
+  return head;
+}
+function findHoleBridge(hole, outerNode) {
+  let p = outerNode;
+  const hx = hole.x;
+  const hy = hole.y;
+  let qx = -Infinity;
+  let m;
+  if (equals(hole, p)) return p;
+  for (let b = 0, g = 0; b < numBlocks; b++, g += 4) {
+    if (hy < blockBBox[g + 1] || hy > blockBBox[g + 3] || blockBBox[g] > hx || blockBBox[g + 2] <= qx)
+      continue;
+    const stop = liveBlockStop(b);
+    p = liveBlockHead(b);
+    do {
+      if (p.prev.next === p) {
+        if (equals(hole, p.next)) return p.next;
+        else if (hy <= p.y && hy >= p.next.y && p.next.y !== p.y) {
+          const x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y);
+          if (x <= hx && x > qx) {
+            qx = x;
+            m = p.x < p.next.x ? p : p.next;
+            if (x === hx) return m;
+          }
+        }
+      }
+      p = p.next;
+    } while (p !== stop);
+  }
+  if (!m) return null;
+  const mx = m.x;
+  const my = m.y;
+  const tminY = Math.min(hy, my);
+  const tmaxY = Math.max(hy, my);
+  let tanMin = Infinity;
+  for (let b = 0, g = 0; b < numBlocks; b++, g += 4) {
+    if (blockBBox[g + 2] < mx || blockBBox[g] > hx || blockBBox[g + 3] < tminY || blockBBox[g + 1] > tmaxY)
+      continue;
+    const stop = liveBlockStop(b);
+    p = liveBlockHead(b);
+    do {
+      if (p.prev.next === p && hx >= p.x && p.x >= mx && hx !== p.x && // skip dead nodes
+      pointInTriangle(
+        hy < my ? hx : qx,
+        hy,
+        mx,
+        my,
+        hy < my ? qx : hx,
+        hy,
+        p.x,
+        p.y
+      )) {
+        const tan = Math.abs(hy - p.y) / (hx - p.x);
+        if ((locallyInside(p, hole) || p.y === hy && p.next.y === hy && p.next.x > hx) && (tan < tanMin || tan === tanMin && (p.x > m.x || p.x === m.x && sectorContainsSector(m, p)))) {
+          m = p;
+          tanMin = tan;
+        }
+      }
+      p = p.next;
+    } while (p !== stop);
+  }
+  return m;
+}
+function sectorContainsSector(m, p) {
+  return area(m.prev, m, p.prev) < 0 && area(p.next, m, m.next) < 0;
+}
+var sortArr = [];
+var sortBuf = [];
+var zArr = new Uint32Array(0);
+var zBuf = new Uint32Array(0);
+var counts = new Uint32Array(256);
+function indexCurve(start, minX, minY, invSize) {
+  let p = start;
+  let n = 0;
+  do {
+    p.z = zOrder(p.x, p.y, minX, minY, invSize);
+    sortArr[n++] = p;
+    p = p.next;
+  } while (p !== start);
+  sortNodes(n);
+  let prev = null;
+  for (let i = 0; i < n; i++) {
+    const node = sortArr[i];
+    node.prevZ = prev;
+    if (prev) prev.nextZ = node;
+    prev = node;
+  }
+  prev.nextZ = null;
+  sortArr.fill(
+    /** @type {Node} */
+    /** @type {unknown} */
+    null,
+    0,
+    n
+  );
+  sortBuf.fill(
+    /** @type {Node} */
+    /** @type {unknown} */
+    null,
+    0,
+    n
+  );
+}
+function sortNodes(n) {
+  if (n <= 32) {
+    for (let i = 1; i < n; i++) {
+      const node = sortArr[i], z = node.z;
+      let j = i - 1;
+      while (j >= 0 && sortArr[j].z > z) {
+        sortArr[j + 1] = sortArr[j];
+        j--;
+      }
+      sortArr[j + 1] = node;
+    }
+    return;
+  }
+  if (zArr.length < n) {
+    zArr = new Uint32Array(n);
+    zBuf = new Uint32Array(n);
+    sortBuf = new Array(n);
+  }
+  for (let i = 0; i < n; i++) zArr[i] = sortArr[i].z;
+  radixPass(n, sortArr, zArr, sortBuf, zBuf, 0);
+  radixPass(n, sortBuf, zBuf, sortArr, zArr, 8);
+  radixPass(n, sortArr, zArr, sortBuf, zBuf, 16);
+  radixPass(n, sortBuf, zBuf, sortArr, zArr, 24);
+}
+function radixPass(n, src, srcZ, dst, dstZ, shift) {
+  counts.fill(0);
+  for (let i = 0; i < n; i++) counts[srcZ[i] >>> shift & 255]++;
+  let sum = 0;
+  for (let b = 0; b < 256; b++) {
+    const c = counts[b];
+    counts[b] = sum;
+    sum += c;
+  }
+  for (let i = 0; i < n; i++) {
+    const z = srcZ[i];
+    const pos = counts[z >>> shift & 255]++;
+    dst[pos] = src[i];
+    dstZ[pos] = z;
+  }
+}
+function zOrder(x, y, minX, minY, invSize) {
+  x = (x - minX) * invSize | 0;
+  y = (y - minY) * invSize | 0;
+  x = (x | x << 8) & 16711935;
+  x = (x | x << 4) & 252645135;
+  x = (x | x << 2) & 858993459;
+  x = (x | x << 1) & 1431655765;
+  y = (y | y << 8) & 16711935;
+  y = (y | y << 4) & 252645135;
+  y = (y | y << 2) & 858993459;
+  y = (y | y << 1) & 1431655765;
+  return x | y << 1;
+}
+function getLeftmost(start) {
+  let p = start, leftmost = start;
+  do {
+    if (p.x < leftmost.x || p.x === leftmost.x && p.y < leftmost.y)
+      leftmost = p;
+    p = p.next;
+  } while (p !== start);
+  return leftmost;
+}
+function pointInTriangle(ax, ay, bx, by, cx, cy, px, py) {
+  return (cx - px) * (ay - py) >= (ax - px) * (cy - py) && (ax - px) * (by - py) >= (bx - px) * (ay - py) && (bx - px) * (cy - py) >= (cx - px) * (by - py);
+}
+function isValidDiagonal(a, b) {
+  const zeroLength = equals(a, b) && area(a.prev, a, a.next) > 0 && area(b.prev, b, b.next) > 0;
+  return a.next.i !== b.i && (zeroLength || locallyInside(a, b) && locallyInside(b, a) && // // locally visible
+  (area(a.prev, a, b.prev) !== 0 || area(a, b.prev, b) !== 0)) && // no opposite-facing sectors
+  !intersectsPolygon(a, b) && (zeroLength || middleInside(a, b));
+}
+function area(p, q, r) {
+  return (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+}
+function equals(p1, p2) {
+  return p1.x === p2.x && p1.y === p2.y;
+}
+function intersects(p1, q1, p2, q2, includeBoundary = true) {
+  const o1 = area(p1, q1, p2);
+  const o2 = area(p1, q1, q2);
+  const o3 = area(p2, q2, p1);
+  const o4 = area(p2, q2, q1);
+  if ((o1 > 0 && o2 < 0 || o1 < 0 && o2 > 0) && (o3 > 0 && o4 < 0 || o3 < 0 && o4 > 0))
+    return true;
+  if (!includeBoundary) return false;
+  if (o1 === 0 && onSegment(p1, p2, q1)) return true;
+  if (o2 === 0 && onSegment(p1, q2, q1)) return true;
+  if (o3 === 0 && onSegment(p2, p1, q2)) return true;
+  if (o4 === 0 && onSegment(p2, q1, q2)) return true;
+  return false;
+}
+function onSegment(p, q, r) {
+  return q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y);
+}
+function intersectsPolygon(a, b) {
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  let p = a;
+  do {
+    const n = p.next;
+    if (p.x > maxX && n.x > maxX || p.x < minX && n.x < minX || p.y > maxY && n.y > maxY || p.y < minY && n.y < minY) {
+      p = n;
+      continue;
+    }
+    if (p.i !== a.i && n.i !== a.i && p.i !== b.i && n.i !== b.i && intersects(p, n, a, b))
+      return true;
+    p = n;
+  } while (p !== a);
+  return false;
+}
+function locallyInside(a, b) {
+  return area(a.prev, a, a.next) < 0 ? area(a, b, a.next) >= 0 && area(a, a.prev, b) >= 0 : area(a, b, a.prev) < 0 || area(a, a.next, b) < 0;
+}
+function middleInside(a, b) {
+  let p = a;
+  let inside = false;
+  const px = (a.x + b.x) / 2;
+  const py = (a.y + b.y) / 2;
+  do {
+    const n = p.next;
+    if (p.y > py !== n.y > py && px < (n.x - p.x) * (py - p.y) / (n.y - p.y) + p.x)
+      inside = !inside;
+    p = n;
+  } while (p !== a);
+  return inside;
+}
+function splitPolygon(a, b) {
+  const a2 = createNode(a.i, a.x, a.y), b2 = createNode(b.i, b.x, b.y), an = a.next, bp = b.prev;
+  a.next = b;
+  b.prev = a;
+  a2.next = an;
+  an.prev = a2;
+  b2.next = a2;
+  a2.prev = b2;
+  bp.next = b2;
+  b2.prev = bp;
+  return b2;
+}
+function insertNode(i, x, y, last) {
+  const p = createNode(i, x, y);
+  if (!last) {
+    p.prev = p;
+    p.next = p;
+  } else {
+    p.next = last.next;
+    p.prev = last;
+    last.next.prev = p;
+    last.next = p;
+  }
+  return p;
+}
+function removeNode(p) {
+  p.next.prev = p.prev;
+  p.prev.next = p.next;
+  if (p.prevZ) p.prevZ.nextZ = p.nextZ;
+  if (p.nextZ) p.nextZ.prevZ = p.prevZ;
+  if (indexActive) growBlock(p.prev, p.next);
+}
+function createNode(i, x, y) {
+  return (
+    /** @type {Node} */
+    /** @type {unknown} */
+    {
+      i,
+      // vertex index in coordinates array
+      x,
+      y,
+      // vertex coordinates
+      prev: null,
+      // previous and next vertex nodes in a polygon ring
+      next: null,
+      z: 0,
+      // z-order curve value; doubles as owning block in the hole-bridge index during eliminateHoles
+      prevZ: null,
+      // previous and next nodes in z-order
+      nextZ: null
+    }
+  );
+}
+function signedArea2(data, start, end, dim) {
+  let sum = 0;
+  for (let i = start, j = end - dim; i < end; i += dim) {
+    sum += (data[j] - data[i]) * (data[i + 1] + data[j + 1]);
+    j = i;
+  }
+  return sum;
+}
+
+// src/js/util/message.js
+var message_default = (...args) => {
+  const obj = {};
+  for (var i = 0; i < args.length; i += 2) {
+    obj[args[i]] = args[i + 1];
+  }
+  self.postMessage(obj);
+};
+
+// src/js/style.js
+var style_default = [
+  {
+    // \u9244\u9053
+    Type: "l",
+    Layer: "t",
+    Color: [0.59, 0.59, 0.59],
+    //"150,150,150",
+    // Color: '969696',
+    thickness: [
+      [15, 20],
+      [18, 50]
+    ]
+    // thickness: 5,
+    // Dash: [30, 30],
+    // thickness: [
+    // 	[10, 3],
+    // 	[15, 20],
+    // ],
+  },
+  {
+    // \u5EFA\u7269
+    Type: "f",
+    Layer: "b",
+    Color: [0.94, 0.96, 0.94],
+    //"240,245,240",
+    // Color: 'f0f5f0',
+    // Color: '200,200,200',
+    // thickness: 1,
+    thickness: 1,
+    OPacity: [
+      [14, 0],
+      [17, 1]
+    ]
+    // OPacity: .5,
+  },
+  {
+    // \u9053\u8DEF\u8F2A\u90ED
+    Type: "l",
+    Layer: "r1",
+    Color: [0.39, 0.39, 0.39],
+    //"99,99,99",
+    // Color: '636363',
+    thickness: 1,
+    OPacity: [
+      [16, 0],
+      [18, 1]
+    ]
+  },
+  {
+    // \u9053\u8DEF\u90E8\u54C1
+    Type: "l",
+    Layer: "r2",
+    Color: [0.77, 0.63, 0],
+    //"196,160,0",
+    // Color: 'c4a000',
+    thickness: 1
+    // OPacity: [
+    //   [16, 0],
+    //   [17, 1],
+    // ],
+  },
+  {
+    // \u305D\u306E\u4ED6\u306E\u9053\u8DEF
+    Type: "f",
+    Layer: "r5",
+    Color: [1, 1, 1]
+    // Color: 'ffffff',
+  },
+  {
+    // \u9AD8\u901F
+    Type: "f",
+    Layer: "r3",
+    Color: [1, 0.77, 0.6]
+    //"255,197,153",
+    // Color: 'ffc599',
+  },
+  {
+    // \u9AD8\u901F // Zoom13\u4EE5\u4E0B\u306E\u3068\u304D
+    Type: "l",
+    Layer: "r8",
+    Color: [1, 0.77, 0.6],
+    //"255,197,153",
+    // Color: 'ffc599',
+    // thickness: 1,
+    // OPacity: [
+    // 	[10, 0],
+    // 	[12, 1],
+    // ],
+    thickness: [
+      [10, 5],
+      [13, 10]
+    ]
+  },
+  {
+    // \u56FD\u9053
+    Type: "f",
+    Layer: "r4",
+    Color: [0.93, 0.86, 0.58]
+    //"239,220,148",
+    // Color: 'efdc94',
+  },
+  {
+    // \u56FD\u9053 // Zoom13\u4EE5\u4E0B\u306E\u3068\u304D
+    Type: "l",
+    Layer: "r9",
+    Color: [0.93, 0.86, 0.58],
+    //"239,220,148",
+    // Color: 'efdc94',
+    // thickness: 1,
+    // OPacity: [
+    // 	[10, 0],
+    // 	[12],
+    // ],
+    thickness: [
+      [10, 5],
+      [16, 30]
+    ]
+  },
+  {
+    // \u30C8\u30F3\u30CD\u30EB
+    Type: "l",
+    Layer: "r6",
+    Color: [0.39, 0.39, 0.39],
+    //"100,100,100",
+    // Color: '646464',
+    thickness: 2
+    // Dash: [20, 20],
+  },
+  {
+    // \u6C34\u57DF
+    Type: "f",
+    Layer: "w",
+    Color: [0.66, 0.86, 1]
+    //"170,221,255",
+    // Color: 'aaddff',
+  },
+  {
+    // \u7DD1
+    Type: "f",
+    Layer: "g",
+    Color: [0.8, 0.93, 0.66]
+    //"204,238,170",
+    // Color: 'cceeaa',
+  },
+  // \u6587\u5B57\u7528\u306E\u30EC\u30A4\u30E4
+  {
+    Type: "p",
+    Layer: "c",
+    // text: "name",
+    Color: [0.4, 0.4, 0.4],
+    //"102,102,102",
+    // Color: '666666',
+    Size: 14,
+    Padding: 10
+    // Css: {
+    // 	"border-radius": "4px",
+    // 	"background": "rgba(255,255,255,.5)",
+    // 	"padding": "5px",
+    // 	"font": "14px bold gothic",
+    // 	"color": "#333",
+    // }
+  },
+  {
+    // \u9053\u8DEF\u306E\u6587\u5B57
+    Type: "p",
+    Layer: "rt",
+    // Color: "#fff",
+    Size: 12,
+    // text: "ref", //\u5C5E\u6027\u306Fn\u306B\u7D71\u4E00
+    // Padding: 10,
+    // OPacity: [
+    // 	[14, 0],
+    // 	[14, 1],
+    // ],
+    Css: {
+      "border": "1px solid #fff",
+      "border-radius": "4px 4px 50% 50%",
+      "background": "#06a",
+      "padding": "5px",
+      "color": "#fff"
+    }
+  },
+  {
+    Type: "p",
+    Layer: "d",
+    // text: "name",
+    Color: [0.4, 0.4, 0.4],
+    //"102,102,102",
+    // Color: '666666',
+    Size: 12,
+    // Padding: 10,
+    OPacity: [
+      [13, 0],
+      [14, 1]
+    ]
+  },
+  {
+    Type: "s",
+    Layer: "p"
+    // text: "name",
+    // desc: "com",  t\u306B\u5909\u66F4
+    // cat: "Type",  c\u306B\u5909\u66F4
+    // Color: '102,102,102',
+    // Size: 13,
+  }
+  // { // \u6C34\u57DF
+  // 	Type: "f",
+  // 	Layer: "w2",
+  // 	Color: '170,221,255',
+  // },
+];
+
+// src/js/loadTile.js
+var loadTile_default = async (zxy) => {
+  let polygonVertex = [];
+  let polygonVertexBase = 0;
+  let polygonIndex = [];
+  let borderIndex = [];
+  let borderIndexBase = 0;
+  let lineVertex = [];
+  let lineIndex = [];
+  let thinVertex = [];
+  let thinIndex = [];
+  let thinIndexBase = 0;
+  var d = await fetch("https://192.168.11.2/t/" + zxy.join("/"));
+  d = await new Pbf(await d.arrayBuffer());
+  var layers = new VectorTile(d).layers;
+  for (var n = style_default.length; n--; ) {
+    var styleProp = style_default[n];
+    var layerName = styleProp.Layer;
+    var layer = layers[layerName];
+    if (!layer) continue;
+    if (/p|s/.test(styleProp.Type)) {
+      makeFeatures(layer, styleProp, zxy);
+    } else {
+      processMVTLayer(layer, styleProp);
+    }
+  }
+  return {
+    polygonVertex,
+    polygonIndex,
+    borderIndex,
+    lineVertex,
+    lineIndex,
+    thinVertex,
+    thinIndex
+  };
+  function makeFeatures(layer2, prop, zxy2) {
+    const f = [];
+    for (var i = 0; i < layer2.length; i++) {
+      const feature = layer2.feature(i);
+      const geometry = feature.loadGeometry();
+      const cat = geometry.properties["c"];
+      let desc = geometry.properties["t"];
+      if (cat == "bs" && desc) {
+        desc = desc.replace("S", "\\u897F\\u80A5\\u30D0\\u30B9").replace("W", "\\u662D\\u548C\\u30D0\\u30B9");
+      }
+      f.push({
+        "p": geometry.lines[0][0],
+        "t": feature.properties["n"],
+        "d": desc,
+        "c": cat
+      });
+    }
+    message_default("d", {
+      "f": f,
+      "p": {
+        "type": prop.Type,
+        "layer": prop.Layer,
+        "color": prop.Color,
+        "size": prop.Size,
+        "opacity": prop.OPacity,
+        "css": prop.Css
+      },
+      "z": zxy2
+    });
+  }
+  function isClockwise(ring) {
+    let sum = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const p1 = ring[i];
+      const p2 = ring[(i + 1) % ring.length];
+      sum += (p2[0] - p1[0]) * (p2[1] + p1[1]);
+    }
+    return sum < 0;
+  }
+  function processMVTLayer(layer2, prop) {
+    var styleId = prop.ID;
+    var strokeThickness = prop.thickness || 0;
+    if (prop.Type == "f") {
+      for (var i = 0; i < layer2.length; i++) {
+        const feature = layer2.feature(i);
+        if (feature.type !== 3) continue;
+        const geometry = feature.loadGeometry().lines;
+        let currentPolygonRings = [];
+        for (const ring of geometry) {
+          if (ring.length === 0) continue;
+          const formattedRing = ring.map((p) => [p.x, p.y]);
+          if (isClockwise(formattedRing)) {
+            if (currentPolygonRings.length > 0) {
+              addPolygon(currentPolygonRings, styleId, strokeThickness);
+            }
+            currentPolygonRings = [formattedRing];
+          } else {
+            currentPolygonRings.push(formattedRing);
+          }
+        }
+        if (currentPolygonRings.length > 0) {
+          addPolygon(currentPolygonRings, styleId, strokeThickness);
+        }
+      }
+    } else {
+      for (var i = 0; i < layer2.length; i++) {
+        const feature = layer2.feature(i);
+        if (feature.type !== 2) continue;
+        const geometry = feature.loadGeometry().lines;
+        for (const ring of geometry) {
+          if (ring.length === 0) continue;
+          const formattedRing = ring.map((p) => [p.x, p.y]);
+          if (strokeThickness != 1) {
+            addPolyline(formattedRing, styleId);
+          } else {
+            addThin(formattedRing, styleId);
+          }
+        }
+      }
+    }
+  }
+  function addThin(points, styleId) {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      thinVertex.push(...p, styleId, 0, 0, 0);
+      if (i < points.length - 1) {
+        thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
+      }
+    }
+    thinIndexBase += points.length;
+  }
+  function addPolygon(rings, styleId, strokeThickness) {
+    const earcutRawData = [];
+    const holeIndices = [];
+    let currentVertexCount = 0;
+    for (let i = 0; i < rings.length; i++) {
+      const ring = rings[i];
+      if (!ring.length) continue;
+      if (i > 0) {
+        holeIndices.push(currentVertexCount);
+      }
+      for (let i2 = 0; i2 < ring.length; i2++) {
+        const p = ring[i2];
+        earcutRawData.push(p[0], p[1]);
+        polygonVertex.push(...p, styleId, 0, 0, 0);
+        currentVertexCount++;
+        if (strokeThickness > 0) {
+          borderIndex.push(
+            borderIndexBase + i2,
+            borderIndexBase + (i2 + 1 == ring.length ? 0 : i2 + 1)
+          );
+        }
+      }
+      borderIndexBase += ring.length;
+    }
+    const indices = earcut(earcutRawData, holeIndices);
+    if (!indices.length) return;
+    indices.forEach((idx) => {
+      polygonIndex.push(polygonVertexBase + idx);
+    });
+    polygonVertexBase += currentVertexCount;
+  }
+  function addPolyline(points, styleId) {
+    const numPoints = points.length;
+    if (numPoints < 2) return;
+    for (let i = 0; i < numPoints - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      const base = lineVertex.length / 6;
+      const dx = next[0] - current[0];
+      const dy = -next[1] + current[1];
+      lineVertex.push(...current, styleId, dy, -dx, 0);
+      lineVertex.push(...current, styleId, -dy, dx, 0);
+      lineVertex.push(...next, styleId, -dy, dx, 0);
+      lineVertex.push(...next, styleId, dy, -dx, 0);
+      lineIndex.push(base, base + 1, base + 2, base + 2, base + 3, base);
+      if (i > 0) {
+        lineIndex.push(base, base - 1, base + 1, base + 1, base - 2, base);
+      }
+    }
+  }
+};
+
+// src/js/util/constants.js
+var baseTile = {
+  baseTileZ: 10,
+  baseTileX: 879,
+  baseTileY: 410,
+  tileSizePixels: 1024
+};
+
+// src/js/util/calc.js
+var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
+
+// src/js/makePipline.js
+var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, topology, fEntryPoint = "fs_main", isMask, stencil = {
+  compare: "equal",
+  // \u30B9\u30C6\u30F3\u30B7\u30EB\u5024\u304C\u4E00\u81F4\u3059\u308B\u5834\u5408\u306E\u307F\u63CF\u753B
+  passOp: "keep",
+  // \u30B9\u30C6\u30F3\u30B7\u30EB\u5024\u306F\u5909\u66F4\u3057\u306A\u3044
+  failOp: "keep",
+  depthFailOp: "keep"
+}) => {
+  const obj = {
+    // layout: "auto" \u306E\u4EE3\u308F\u308A\u306B\u30012\u3064\u306E\u8A2D\u8A08\u56F3\u3092\u914D\u5217\u3067\u6E21\u3059
+    layout: device2.createPipelineLayout({
+      bindGroupLayouts: [commonBindGroupLayout]
+    }),
+    vertex: {
+      module: shaderModule,
+      entryPoint: vEntryPoint,
+      buffers: [
+        {
+          arrayStride: 12,
+          stepMode: "vertex",
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: "sint16x2" },
+            // \u5EA7\u6A19 -> \u30B7\u30A7\u30FC\u30C0\u30FC\u306E @location(0)
+            { shaderLocation: 1, offset: 4, format: "sint16" },
+            // \u5C5E\u6027ID -> @location(1)
+            // offset: 6 \u306E\u30D1\u30C7\u30A3\u30F3\u30B02\u30D0\u30A4\u30C8\u306F\u81EA\u52D5\u7684\u306B\u30B9\u30AD\u30C3\u30D7\u3055\u308C\u308B
+            { shaderLocation: 2, offset: 8, format: "sint16x2" }
+            // \u6CD5\u7DDA -> @location(2)
+          ]
+        }
+      ]
+    },
+    fragment: {
+      module: shaderModule,
+      entryPoint: fEntryPoint,
+      targets: [
+        {
+          format: presentationFormat,
+          blend: {
+            color: {
+              srcFactor: "src-alpha",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add"
+            },
+            alpha: {
+              srcFactor: "one",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add"
+            }
+          }
+        }
+      ]
+    },
+    primitive: { topology, cullMode: "none" },
+    depthStencil: {
+      format: "depth24plus-stencil8",
+      depthWriteEnabled: !isMask,
+      // \u2605\u901A\u5E38\u901A\u308A\u6DF1\u5EA6\u3092\u66F8\u304D\u8FBC\u3080
+      depthCompare: isMask ? "always" : "greater",
+      stencilFront: stencil,
+      stencilBack: stencil
+    },
+    multisample: {
+      count: 4
+      // \u2605\u30D1\u30A4\u30D7\u30E9\u30A4\u30F3\u5074\u3067\u30824\u500D\u3092\u660E\u793A
+    }
+  };
+  if (isMask) {
+    delete obj.vertex.buffers;
+  }
+  return device2.createRenderPipeline(obj);
+};
+
+// src/js/worker.js
+var canvas;
+var size;
+var device;
+var styleUniformBuffer;
+var msaaColorTexture;
+var msaaDepthTexture;
+var { baseTileZ: baseTileZ2, baseTileX: baseTileX2, baseTileY: baseTileY2, tileSizePixels: tileSizePixels2 } = baseTile;
+self.onmessage = async (e) => {
+  if (e.data["c"]) {
+    canvas = e.data["c"];
+    size = e.data["s"];
+    const sab = e.data["b"];
+    const viewArray = new Float32Array(sab);
+    init(viewArray);
+  } else if (e.data["s"]) {
+    size = e.data["s"];
+    canvas.width = size[0];
+    canvas.height = size[1];
+    updateCanvasSize(size);
+  }
+};
+async function init(viewArray) {
+  const adapter = await navigator.gpu?.requestAdapter();
+  device = await adapter?.requestDevice();
+  if (!device) {
+    message_default("e", "WebGPU \\u3092\\u30B5\\u30DD\\u30FC\\u30C8\\u3057\\u3066\\u3044\\u306A\\u3044\\u30D6\\u30E9\\u30A6\\u30B6\\u3001\\u307E\\u305F\\u306F\\u74B0\\u5883\\u3067\\u3059\\u3002");
+    return;
+  }
+  if (true) {
+    device.pushErrorScope("validation");
+    const error = await device.popErrorScope();
+    if (error) {
+      console.error("WebGPU \\u30D0\\u30EA\\u30C7\\u30FC\\u30B7\\u30E7\\u30F3\\u30A8\\u30E9\\u30FC:", error.message);
+    }
+    device.lost.then((info) => {
+      console.error(\`WebGPU \\u30C7\\u30D0\\u30A4\\u30B9\\u304C\\u55AA\\u5931\\u3057\\u307E\\u3057\\u305F\\u3002\\u7406\\u7531: \${info.reason}\`);
+      console.error(\`\\u30E1\\u30C3\\u30BB\\u30FC\\u30B8: \${info.message}\`);
+      if (info.reason === "destroyed") {
+        console.log("\\u30C7\\u30D0\\u30A4\\u30B9\\u306F\\u610F\\u56F3\\u7684\\u306B\\u7834\\u68C4\\u3055\\u308C\\u307E\\u3057\\u305F\\u3002");
+      } else {
+        console.log("\\u30C7\\u30D0\\u30A4\\u30B9\\u3092\\u518D\\u521D\\u671F\\u5316\\u3057\\u307E\\u3059...");
+      }
+    });
+  }
+  const context = canvas.getContext("webgpu");
+  canvas.width = size[0];
+  canvas.height = size[1];
+  const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+  context.configure({
+    device,
+    format: presentationFormat,
+    // alphaMode: "opaque",
+    alphaMode: "premultiplied"
+  });
+  const bindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        // | GPUShaderStage.FRAGMENT,
+        buffer: { type: "uniform" }
+        // Uniform\u30D0\u30C3\u30D5\u30A1\u304C\u5165\u308A\u307E\u3059\u3088\u3068\u3044\u3046\u5BA3\u8A00
+      },
+      {
+        binding: 1,
+        // \u30BF\u30A4\u30EB\u6BCE\u306E\u884C\u5217\uFF08\u52D5\u7684\uFF09
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "uniform", hasDynamicOffset: true }
+        // \u52D5\u7684\u30AA\u30D5\u30BB\u30C3\u30C8\u3042\u308A\uFF01
+      }
+    ]
+  });
+  const shaderModule = device.createShaderModule({ code: shader_default });
+  const maskPipeline = makePipline_default(
+    device,
+    bindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_mask",
+    "triangle-strip",
+    "fs_dummy",
+    true,
+    {
+      compare: "always",
+      passOp: "replace"
+    }
+  );
+  const polygonPipeline = makePipline_default(
+    device,
+    bindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_polygon",
+    "triangle-list"
+  );
+  const thinLinePipeline = makePipline_default(
+    device,
+    bindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_thinline",
+    "line-list"
+  );
+  const linePipeline = makePipline_default(
+    device,
+    bindGroupLayout,
+    presentationFormat,
+    shaderModule,
+    "vs_polyline",
+    "triangle-list",
+    "fs_polyline"
+  );
+  if (true) {
+    const compilationInfo = await shaderModule.getCompilationInfo();
+    for (const message of compilationInfo.messages) {
+      console.error(
+        \`WGSL error: \${message.message} at line \${message.lineNum}\`
+      );
+    }
+  }
+  styleUniformBuffer = device.createBuffer({
+    size: 512,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+  });
+  const megaMatrixBuffer = device.createBuffer({
+    size: 50 * 256,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+  });
+  let clampTable = [];
+  let styleTable = [];
+  for (let i = style_default.length; i--; ) {
+    const s = style_default[i];
+    if (/p|s/.test(s.Type)) continue;
+    s.ID = ~~(styleTable.length / 8);
+    let thickness = s.thickness || 1;
+    let opacity = s.OPacity || 1;
+    if (Array.isArray(thickness)) {
+      clampTable.push(...thickness.flat());
+      thickness = -(~~clampTable.length / 4);
+    }
+    if (Array.isArray(opacity)) {
+      clampTable.push(...opacity.flat());
+      opacity = -(~~clampTable.length / 4);
+    }
+    const fillColor = s.Type == "l" ? [1, 1, 1] : s.Color;
+    const lineColor = s.Type == "f" ? [0, 0, 0] : s.Color;
+    styleTable.push(...fillColor, opacity, ...lineColor, thickness);
+  }
+  device.queue.writeBuffer(
+    styleUniformBuffer,
+    16,
+    new Float32Array(clampTable)
+  );
+  device.queue.writeBuffer(
+    styleUniformBuffer,
+    128,
+    new Float32Array(styleTable)
+  );
+  const globalBindGroup = device.createBindGroup({
+    layout: bindGroupLayout,
+    // \u30B0\u30EB\u30FC\u30D70\u306E\u8A2D\u8A08\u56F3\u3092\u6307\u5B9A
+    entries: [
+      { binding: 0, resource: { buffer: styleUniformBuffer } },
+      // \u5B9F\u4F53\u30D0\u30C3\u30D5\u30A1
+      { binding: 1, resource: { buffer: megaMatrixBuffer, size: 32 } }
+      // 1\u56DE\u306B\u8AAD\u3080\u306E\u306F32\u30D0\u30A4\u30C8
+    ]
+  });
+  const visibleTiles = [];
+  var zxys = [
+    [15, 28191, 13180],
+    [15, 28192, 13180],
+    [15, 28191, 13179],
+    [15, 28192, 13179]
+  ];
+  for (const zxy of zxys) {
+    var tileData = await loadTile_default(zxy);
+    console.log("tiledata:", tileData);
+    const drawData = onCreateTile(device, tileData, zxy);
+    visibleTiles.push(drawData);
+  }
+  updateCanvasSize(size);
+  function render() {
+    requestAnimationFrame(render);
+    if (!viewArray[3]) return;
+    const start = performance.now();
+    const commandEncoder = device.createCommandEncoder();
+    const renderPass = commandEncoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: msaaColorTexture.createView(),
+          resolveTarget: context.getCurrentTexture().createView(),
+          clearValue: {
+            r: 0.96,
+            g: 0.97,
+            b: 0.98,
+            a: 1
+          },
+          loadOp: "clear",
+          storeOp: "discard"
+        }
+      ],
+      depthStencilAttachment: {
+        view: msaaDepthTexture.createView(),
+        depthClearValue: 0,
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
+        stencilClearValue: 0,
+        // \u30B9\u30C6\u30F3\u30B7\u30EB\u306E\u521D\u671F\u5024
+        stencilLoadOp: "clear",
+        stencilStoreOp: "store"
+      }
+    });
+    device.queue.writeBuffer(
+      styleUniformBuffer,
+      0,
+      new Float32Array([viewArray[2]])
+    );
+    const matrixUploadData = new Float32Array(visibleTiles.length * 64);
+    renderPass.setPipeline(maskPipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
+      const matrix = computeTileMatrix3x2(
+        ...tile.zxy,
+        4096,
+        viewArray[0],
+        viewArray[1],
+        viewArray[2],
+        ...size
+      );
+      const offsetInFloat32 = i * 64;
+      matrixUploadData.set(matrix, offsetInFloat32);
+    }
+    device.queue.writeBuffer(megaMatrixBuffer, 0, matrixUploadData);
+    renderPass.setPipeline(maskPipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const dynamicOffset = i * 256;
+      renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
+      renderPass.setStencilReference(i + 1);
+      renderPass.draw(4, 1, 0, 0);
+    }
+    renderPass.setPipeline(polygonPipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
+      if (tile.polygonIndexCount > 0) {
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
+        renderPass.setStencilReference(i + 1);
+        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
+        renderPass.setIndexBuffer(tile.polygonIndexBuffer, "uint16");
+        renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
+      }
+    }
+    renderPass.setPipeline(thinLinePipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
+      if (tile.borderIndexCount > 0) {
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
+        renderPass.setStencilReference(i + 1);
+        renderPass.setVertexBuffer(0, tile.polygonVertexBuffer);
+        renderPass.setIndexBuffer(tile.borderIndexBuffer, "uint16");
+        renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
+      }
+    }
+    renderPass.setPipeline(linePipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
+      if (tile.lineIndexCount > 0) {
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
+        renderPass.setStencilReference(i + 1);
+        renderPass.setVertexBuffer(0, tile.lineVertexBuffer);
+        renderPass.setIndexBuffer(tile.lineIndexBuffer, "uint16");
+        renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
+      }
+    }
+    renderPass.setPipeline(thinLinePipeline);
+    for (let i = 0; i < visibleTiles.length; i++) {
+      const tile = visibleTiles[i];
+      if (tile.thinIndexCount > 0) {
+        const dynamicOffset = i * 256;
+        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
+        renderPass.setStencilReference(i + 1);
+        renderPass.setVertexBuffer(0, tile.thinVertexBuffer);
+        renderPass.setIndexBuffer(tile.thinIndexBuffer, "uint16");
+        renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
+      }
+    }
+    renderPass.end();
+    device.queue.submit([commandEncoder.finish()]);
+    viewArray[3] = 0;
+    message_default("t", performance.now() - start);
+  }
+  render();
+}
+function computeTileMatrix3x2(tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height) {
+  const tilePixelSize = tileSizePixels2 * Math.pow(2, currentZoom - baseTileZ2);
+  const scaleX = tilePixelSize / width * 2;
+  const scaleY = tilePixelSize / height * 2;
+  const zoomDiff = tileZ - baseTileZ2;
+  const shiftedBaseX = baseTileX2 * Math.pow(2, zoomDiff);
+  const shiftedBaseY = baseTileY2 * Math.pow(2, zoomDiff);
+  const localTileX = tileX - shiftedBaseX;
+  const localTileY = tileY - shiftedBaseY;
+  const tileScaleFromBase = 1 / Math.pow(2, zoomDiff);
+  const tileLocalWorldX = localTileX * tileScaleFromBase;
+  const tileLocalWorldY = localTileY * tileScaleFromBase;
+  const m00 = tileScaleFromBase / tileExtent * scaleX;
+  const m01 = 0;
+  const m10 = 0;
+  const m11 = -(tileScaleFromBase / tileExtent) * scaleY;
+  const m20 = (tileLocalWorldX - centerX) * scaleX;
+  const m21 = -(tileLocalWorldY - centerY) * scaleY;
+  return new Float32Array([m00, m01, m10, m11, m20, m21]);
+}
+function updateCanvasSize(size2) {
+  msaaColorTexture = device.createTexture({
+    size: size2,
+    sampleCount: 4,
+    // \u2605\u3053\u3053\u30924\u306B\u3059\u308B
+    format: navigator.gpu.getPreferredCanvasFormat(),
+    usage: GPUTextureUsage.RENDER_ATTACHMENT
+  });
+  msaaDepthTexture = device.createTexture({
+    size: size2,
+    sampleCount: 4,
+    // \u2605\u30AB\u30E9\u30FC\u3068\u5408\u308F\u305B\u308B
+    format: "depth24plus-stencil8",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT
+  });
+}
+`], { type: "application/javascript" });
 var workerUrl = URL.createObjectURL(blob);
 var worker = new Worker(workerUrl);
 worker.postMessage(
