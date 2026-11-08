@@ -36,15 +36,12 @@ export default async (zxy) => {
       processMVTLayer(layer, styleProp);
     }
   }
-  return {
-    polygonVertex,
-    polygonIndex,
-    borderIndex,
-    lineVertex,
-    lineIndex,
-    thinVertex,
-    thinIndex,
-  };
+  return [
+    [polygonVertex, polygonIndex],
+    [0, borderIndex],
+    [thinVertex, thinIndex],
+    [lineVertex, lineIndex],
+  ];
 
   function makeFeatures(layer, prop, zxy) {
     const f = [];

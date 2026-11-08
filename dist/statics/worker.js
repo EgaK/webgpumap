@@ -3,22 +3,6 @@ var shader_default = `struct Vertex{@location(0)pos:vec2i,@location(1)style_id:i
 
 // src/js/onCreateTile.js
 function onCreateTile(device2, tileData, zxy) {
-  const prepareData = (data) => {
-    if (data.length % 2 != 0) {
-      const last = data[data.length - 1];
-      data.push(last);
-    }
-  };
-  console.log(
-    "vertex:",
-    Math.ceil(
-      2 * (tileData.polygonVertex.length + tileData.lineVertex.length + tileData.thinVertex.length) / 1024
-    ),
-    "index:",
-    Math.ceil(
-      2 * (tileData.polygonIndex.length + tileData.borderIndex.length + tileData.lineIndex.length + tileData.thinIndex.length) / 1024
-    )
-  );
   const PAGE_VERTEX_SIZE = 512 * 1024;
   const PAGE_INDEX_SIZE = 256 * 1024;
   const vertexBuffer = device2.createBuffer({
@@ -29,63 +13,39 @@ function onCreateTile(device2, tileData, zxy) {
     size: PAGE_INDEX_SIZE,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
-  device2.queue.writeBuffer(
-    vertexBuffer,
-    0,
-    new Int16Array(tileData.polygonVertex)
-  );
-  prepareData(tileData.polygonIndex);
-  device2.queue.writeBuffer(
-    indexBuffer,
-    0,
-    new Uint16Array(tileData.polygonIndex)
-  );
-  prepareData(tileData.borderIndex);
-  const borderIndexOffset = tileData.polygonIndex.length * 2;
-  device2.queue.writeBuffer(
-    indexBuffer,
-    borderIndexOffset,
-    new Uint16Array(tileData.borderIndex)
-  );
-  const lineVertexOffset = tileData.polygonVertex.length * 2;
-  device2.queue.writeBuffer(
-    vertexBuffer,
-    lineVertexOffset,
-    new Int16Array(tileData.lineVertex)
-  );
-  prepareData(tileData.lineIndex);
-  const lineIndexOffset = borderIndexOffset + tileData.borderIndex.length * 2;
-  device2.queue.writeBuffer(
-    indexBuffer,
-    lineIndexOffset,
-    new Uint16Array(tileData.lineIndex)
-  );
-  const thinVertexOffset = lineVertexOffset + tileData.lineVertex.length * 2;
-  device2.queue.writeBuffer(
-    vertexBuffer,
-    thinVertexOffset,
-    new Int16Array(tileData.thinVertex)
-  );
-  prepareData(tileData.thinIndex);
-  const thinIndexOffset = lineIndexOffset + tileData.lineIndex.length * 2;
-  device2.queue.writeBuffer(
-    indexBuffer,
-    thinIndexOffset,
-    new Uint16Array(tileData.thinIndex)
-  );
+  let vOffset = 0;
+  let vOffsetArray = [];
+  let iOffset = 0;
+  let iOffsetArray = [];
+  let lenArray = [];
+  for (let i = 0; i < tileData.length; i++) {
+    const vtx = tileData[i][0];
+    const idx = tileData[i][1];
+    if (vtx) {
+      device2.queue.writeBuffer(vertexBuffer, vOffset, new Int16Array(vtx));
+      vOffsetArray.push(vOffset);
+      vOffset += vtx.length * 2;
+    } else {
+      vOffsetArray.push(0);
+    }
+    let len = idx.length;
+    if (len % 2 != 0) {
+      const last = idx[len - 1];
+      idx.push(last);
+      len++;
+    }
+    device2.queue.writeBuffer(indexBuffer, iOffset, new Uint16Array(idx));
+    iOffsetArray.push(iOffset);
+    iOffset += idx.length * 2;
+    lenArray.push(len);
+  }
   return {
     zxy,
     vertexBuffer,
     indexBuffer,
-    lineVertexOffset,
-    thinVertexOffset,
-    borderIndexOffset,
-    lineIndexOffset,
-    thinIndexOffset,
-    polygonIndexCount: tileData.polygonIndex.length,
-    borderIndexCount: tileData.borderIndex.length,
-    lineIndexCount: tileData.lineIndex.length,
-    thinIndexCount: tileData.thinIndex.length
+    vOffsetArray,
+    iOffsetArray,
+    lenArray
   };
 }
 
@@ -1731,15 +1691,12 @@ var loadTile_default = async (zxy) => {
       processMVTLayer(layer, styleProp);
     }
   }
-  return {
-    polygonVertex,
-    polygonIndex,
-    borderIndex,
-    lineVertex,
-    lineIndex,
-    thinVertex,
-    thinIndex
-  };
+  return [
+    [polygonVertex, polygonIndex],
+    [0, borderIndex],
+    [thinVertex, thinIndex],
+    [lineVertex, lineIndex]
+  ];
   function makeFeatures(layer2, prop, zxy2) {
     const f = [];
     for (var i = 0; i < layer2.length; i++) {
@@ -1883,17 +1840,6 @@ var loadTile_default = async (zxy) => {
   }
 };
 
-// src/js/util/constants.js
-var baseTile = {
-  baseTileZ: 10,
-  baseTileX: 879,
-  baseTileY: 410,
-  tileSizePixels: 1024
-};
-
-// src/js/util/calc.js
-var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
-
 // src/js/makePipline.js
 var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, shaderModule, vEntryPoint, topology, fEntryPoint = "fs_main", isMask, stencil = {
   compare: "equal",
@@ -1904,7 +1850,6 @@ var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, s
   depthFailOp: "keep"
 }) => {
   const obj = {
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device2.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout]
     }),
@@ -1968,6 +1913,37 @@ var makePipline_default = (device2, commonBindGroupLayout, presentationFormat, s
   return device2.createRenderPipeline(obj);
 };
 
+// src/js/util/constants.js
+var baseTile = {
+  baseTileZ: 10,
+  baseTileX: 879,
+  baseTileY: 410,
+  tileSizePixels: 1024
+};
+
+// src/js/util/transformMatrix.js
+var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
+var transformMatrix_default = (tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height) => {
+  const tilePixelSize = tileSizePixels * Math.pow(2, currentZoom - baseTileZ);
+  const scaleX = tilePixelSize / width * 2;
+  const scaleY = tilePixelSize / height * 2;
+  const zoomDiff = tileZ - baseTileZ;
+  const shiftedBaseX = baseTileX * Math.pow(2, zoomDiff);
+  const shiftedBaseY = baseTileY * Math.pow(2, zoomDiff);
+  const localTileX = tileX - shiftedBaseX;
+  const localTileY = tileY - shiftedBaseY;
+  const tileScaleFromBase = 1 / Math.pow(2, zoomDiff);
+  const tileLocalWorldX = localTileX * tileScaleFromBase;
+  const tileLocalWorldY = localTileY * tileScaleFromBase;
+  const m00 = tileScaleFromBase / tileExtent * scaleX;
+  const m01 = 0;
+  const m10 = 0;
+  const m11 = -(tileScaleFromBase / tileExtent) * scaleY;
+  const m20 = (tileLocalWorldX - centerX) * scaleX;
+  const m21 = -(tileLocalWorldY - centerY) * scaleY;
+  return new Float32Array([m00, m01, m10, m11, m20, m21]);
+};
+
 // src/js/worker.js
 var canvas;
 var size;
@@ -1975,7 +1951,6 @@ var device;
 var styleUniformBuffer;
 var msaaColorTexture;
 var msaaDepthTexture;
-var { baseTileZ: baseTileZ2, baseTileX: baseTileX2, baseTileY: baseTileY2, tileSizePixels: tileSizePixels2 } = baseTile;
 self.onmessage = async (e) => {
   if (e.data["c"]) {
     canvas = e.data["c"];
@@ -2056,30 +2031,37 @@ async function init(viewArray) {
       passOp: "replace"
     }
   );
-  const polygonPipeline = makePipline_default(
-    device,
-    bindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_polygon",
-    "triangle-list"
+  let piplines = [];
+  piplines.push(
+    makePipline_default(
+      device,
+      bindGroupLayout,
+      presentationFormat,
+      shaderModule,
+      "vs_polygon",
+      "triangle-list"
+    )
   );
-  const thinLinePipeline = makePipline_default(
-    device,
-    bindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_thinline",
-    "line-list"
+  piplines.push(
+    makePipline_default(
+      device,
+      bindGroupLayout,
+      presentationFormat,
+      shaderModule,
+      "vs_thinline",
+      "line-list"
+    )
   );
-  const linePipeline = makePipline_default(
-    device,
-    bindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_polyline",
-    "triangle-list",
-    "fs_polyline"
+  piplines.push(
+    makePipline_default(
+      device,
+      bindGroupLayout,
+      presentationFormat,
+      shaderModule,
+      "vs_polyline",
+      "triangle-list",
+      "fs_polyline"
+    )
   );
   if (true) {
     const compilationInfo = await shaderModule.getCompilationInfo();
@@ -2147,6 +2129,7 @@ async function init(viewArray) {
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);
     const drawData = onCreateTile(device, tileData, zxy);
+    console.log({ drawData });
     visibleTiles.push(drawData);
   }
   updateCanvasSize(size);
@@ -2190,7 +2173,7 @@ async function init(viewArray) {
     renderPass.setPipeline(maskPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
-      const matrix = computeTileMatrix3x2(
+      const matrix = transformMatrix_default(
         ...tile.zxy,
         4096,
         viewArray[0],
@@ -2209,64 +2192,29 @@ async function init(viewArray) {
       renderPass.setStencilReference(i + 1);
       renderPass.draw(4, 1, 0, 0);
     }
-    renderPass.setPipeline(polygonPipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.polygonIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.vertexBuffer);
-        renderPass.setIndexBuffer(tile.indexBuffer, "uint16");
-        renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
+    for (let j = 0; j < piplines.length; j++) {
+      const pidx = [0, 1, 1, 2];
+      if (j != 2) {
+        renderPass.setPipeline(piplines[pidx[j]]);
       }
-    }
-    renderPass.setPipeline(thinLinePipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.borderIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.vertexBuffer);
-        renderPass.setIndexBuffer(
-          tile.indexBuffer,
-          "uint16",
-          tile.borderIndexOffset
-        );
-        renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
-      }
-    }
-    renderPass.setPipeline(linePipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.lineIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.lineVertexOffset);
-        renderPass.setIndexBuffer(
-          tile.indexBuffer,
-          "uint16",
-          tile.lineIndexOffset
-        );
-        renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
-      }
-    }
-    renderPass.setPipeline(thinLinePipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.thinIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1);
-        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.thinVertexOffset);
-        renderPass.setIndexBuffer(
-          tile.indexBuffer,
-          "uint16",
-          tile.thinIndexOffset
-        );
-        renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
+      for (let i = 0; i < visibleTiles.length; i++) {
+        const tile = visibleTiles[i];
+        if (tile.lenArray[j] > 0) {
+          const dynamicOffset = i * 256;
+          renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
+          renderPass.setStencilReference(i + 1);
+          renderPass.setVertexBuffer(
+            0,
+            tile.vertexBuffer,
+            tile.vOffsetArray[j]
+          );
+          renderPass.setIndexBuffer(
+            tile.indexBuffer,
+            "uint16",
+            tile.iOffsetArray[j]
+          );
+          renderPass.drawIndexed(tile.lenArray[j], 1, 0, 0, 0);
+        }
       }
     }
     renderPass.end();
@@ -2275,26 +2223,6 @@ async function init(viewArray) {
     message_default("t", performance.now() - start);
   }
   render();
-}
-function computeTileMatrix3x2(tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height) {
-  const tilePixelSize = tileSizePixels2 * Math.pow(2, currentZoom - baseTileZ2);
-  const scaleX = tilePixelSize / width * 2;
-  const scaleY = tilePixelSize / height * 2;
-  const zoomDiff = tileZ - baseTileZ2;
-  const shiftedBaseX = baseTileX2 * Math.pow(2, zoomDiff);
-  const shiftedBaseY = baseTileY2 * Math.pow(2, zoomDiff);
-  const localTileX = tileX - shiftedBaseX;
-  const localTileY = tileY - shiftedBaseY;
-  const tileScaleFromBase = 1 / Math.pow(2, zoomDiff);
-  const tileLocalWorldX = localTileX * tileScaleFromBase;
-  const tileLocalWorldY = localTileY * tileScaleFromBase;
-  const m00 = tileScaleFromBase / tileExtent * scaleX;
-  const m01 = 0;
-  const m10 = 0;
-  const m11 = -(tileScaleFromBase / tileExtent) * scaleY;
-  const m20 = (tileLocalWorldX - centerX) * scaleX;
-  const m21 = -(tileLocalWorldY - centerY) * scaleY;
-  return new Float32Array([m00, m01, m10, m11, m20, m21]);
 }
 function updateCanvasSize(size2) {
   msaaColorTexture = device.createTexture({

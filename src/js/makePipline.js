@@ -15,7 +15,6 @@ export default (
   },
 ) => {
   const obj = {
-    // layout: "auto" の代わりに、2つの設計図を配列で渡す
     layout: device.createPipelineLayout({
       bindGroupLayouts: [commonBindGroupLayout],
     }),

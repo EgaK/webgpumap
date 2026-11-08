@@ -3,10 +3,9 @@ import shaderCode from "./shader.wgsl";
 import onCreateTile from "./onCreateTile";
 import loadTile from "./loadTile";
 import style from "./style";
-import { scale, zxy2center } from "./util/calc";
 import makePipline from "./makePipline";
 import message from "./util/message";
-import { baseTile } from "./util/constants";
+import transformMatrix from "./util/transformMatrix";
 
 var canvas,
   size,
@@ -14,8 +13,6 @@ var canvas,
   styleUniformBuffer,
   msaaColorTexture,
   msaaDepthTexture;
-
-const { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
 
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -115,32 +112,40 @@ async function init(viewArray) {
     },
   );
 
-  const polygonPipeline = makePipline(
-    device,
-    bindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_polygon",
-    "triangle-list",
+  let piplines = [];
+
+  piplines.push(
+    makePipline(
+      device,
+      bindGroupLayout,
+      presentationFormat,
+      shaderModule,
+      "vs_polygon",
+      "triangle-list",
+    ),
   );
 
-  const thinLinePipeline = makePipline(
-    device,
-    bindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_thinline",
-    "line-list",
+  piplines.push(
+    makePipline(
+      device,
+      bindGroupLayout,
+      presentationFormat,
+      shaderModule,
+      "vs_thinline",
+      "line-list",
+    ),
   );
 
-  const linePipeline = makePipline(
-    device,
-    bindGroupLayout,
-    presentationFormat,
-    shaderModule,
-    "vs_polyline",
-    "triangle-list",
-    "fs_polyline",
+  piplines.push(
+    makePipline(
+      device,
+      bindGroupLayout,
+      presentationFormat,
+      shaderModule,
+      "vs_polyline",
+      "triangle-list",
+      "fs_polyline",
+    ),
   );
 
   if (DEVELOP) {
@@ -220,6 +225,7 @@ async function init(viewArray) {
     var tileData = await loadTile(zxy);
     // console.log("tiledata:", tileData);
     const drawData = onCreateTile(device, tileData, zxy);
+    console.log({ drawData });
     visibleTiles.push(drawData);
   }
 
@@ -269,7 +275,7 @@ async function init(viewArray) {
     renderPass.setPipeline(maskPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
-      const matrix = computeTileMatrix3x2(
+      const matrix = transformMatrix(
         ...tile.zxy,
         4096,
         viewArray[0],
@@ -292,71 +298,30 @@ async function init(viewArray) {
       // 頂点バッファなしで4頂点のTriangle Stripを描画
       renderPass.draw(4, 1, 0, 0);
     }
-    //ポリゴン;
-    renderPass.setPipeline(polygonPipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.polygonIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.vertexBuffer);
-        renderPass.setIndexBuffer(tile.indexBuffer, "uint16");
-        renderPass.drawIndexed(tile.polygonIndexCount, 1, 0, 0, 0);
-      }
-    }
 
-    // ボーダー
-    renderPass.setPipeline(thinLinePipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.borderIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.vertexBuffer);
-        renderPass.setIndexBuffer(
-          tile.indexBuffer,
-          "uint16",
-          tile.borderIndexOffset,
-        );
-        renderPass.drawIndexed(tile.borderIndexCount, 1, 0, 0, 0);
+    for (let j = 0; j < piplines.length; j++) {
+      const pidx = [0, 1, 1, 2];
+      if (j != 2) {
+        renderPass.setPipeline(piplines[pidx[j]]);
       }
-    }
-
-    // ポリライン;
-    renderPass.setPipeline(linePipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.lineIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.lineVertexOffset);
-        renderPass.setIndexBuffer(
-          tile.indexBuffer,
-          "uint16",
-          tile.lineIndexOffset,
-        );
-        renderPass.drawIndexed(tile.lineIndexCount, 1, 0, 0, 0);
-      }
-    }
-
-    // 細いポリライン
-    renderPass.setPipeline(thinLinePipeline);
-    for (let i = 0; i < visibleTiles.length; i++) {
-      const tile = visibleTiles[i];
-      if (tile.thinIndexCount > 0) {
-        const dynamicOffset = i * 256;
-        renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
-        renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-        renderPass.setVertexBuffer(0, tile.vertexBuffer, tile.thinVertexOffset);
-        renderPass.setIndexBuffer(
-          tile.indexBuffer,
-          "uint16",
-          tile.thinIndexOffset,
-        );
-        renderPass.drawIndexed(tile.thinIndexCount, 1, 0, 0, 0);
+      for (let i = 0; i < visibleTiles.length; i++) {
+        const tile = visibleTiles[i];
+        if (tile.lenArray[j] > 0) {
+          const dynamicOffset = i * 256;
+          renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
+          renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
+          renderPass.setVertexBuffer(
+            0,
+            tile.vertexBuffer,
+            tile.vOffsetArray[j],
+          );
+          renderPass.setIndexBuffer(
+            tile.indexBuffer,
+            "uint16",
+            tile.iOffsetArray[j],
+          );
+          renderPass.drawIndexed(tile.lenArray[j], 1, 0, 0, 0);
+        }
       }
     }
 
@@ -366,57 +331,6 @@ async function init(viewArray) {
     message("t", performance.now() - start);
   }
   render();
-}
-
-/**
- * 2Dタイル用の3x2マトリックスを計算する関数
- * @returns {Float32Array} 3x2行列（列優先/Column-major, 要素数6）
- */
-function computeTileMatrix3x2(
-  tileZ,
-  tileX,
-  tileY,
-  tileExtent,
-  centerX,
-  centerY,
-  currentZoom, // メインスレッドから送られてきたローカル用の値
-  width,
-  height,
-) {
-  // 現在のズームでの、基準タイル(z=10)の1枚あたりの画面ピクセルサイズ
-  const tilePixelSize = tileSizePixels * Math.pow(2, currentZoom - baseTileZ);
-
-  // クリップ空間（-1 〜 1）に変換するための倍率
-  const scaleX = (tilePixelSize / width) * 2.0;
-  const scaleY = (tilePixelSize / height) * 2.0;
-
-  // 【超重要】描画しようとしているタイルの「基準タイルから見た相対位置」を計算
-  // 描画ターゲットのタイルズーム(tileZ)に合わせて基準タイルの座標をシフトする
-  const zoomDiff = tileZ - baseTileZ;
-  const shiftedBaseX = baseTileX * Math.pow(2, zoomDiff);
-  const shiftedBaseY = baseTileY * Math.pow(2, zoomDiff);
-
-  // 基準タイルから「描画対象のタイル」までの、そのズーム(tileZ)における枚数差（整数）
-  const localTileX = tileX - shiftedBaseX;
-  const localTileY = tileY - shiftedBaseY;
-
-  // それを基準ズーム（z=10）のタイル枚数単位の距離にリスケールする（桁落ちしない）
-  const tileScaleFromBase = 1.0 / Math.pow(2, zoomDiff);
-  const tileLocalWorldX = localTileX * tileScaleFromBase;
-  const tileLocalWorldY = localTileY * tileScaleFromBase;
-
-  // 1列目 & 2列目: タイル内の頂点(0~4096)を縮小して画面サイズに合わせる
-  const m00 = (tileScaleFromBase / tileExtent) * scaleX;
-  const m01 = 0.0;
-  const m10 = 0.0;
-  const m11 = -(tileScaleFromBase / tileExtent) * scaleY;
-
-  // 3列目: 平行移動量（中心座標からの差分）
-  // どちらも「基準タイルから数えて何枚目か（0.0〜3.0程度）」の小さな数同士の引き算なので、f32でも精度が100%保たれる！
-  const m20 = (tileLocalWorldX - centerX) * scaleX;
-  const m21 = -(tileLocalWorldY - centerY) * scaleY;
-
-  return new Float32Array([m00, m01, m10, m11, m20, m21]);
 }
 
 function updateCanvasSize(size) {
