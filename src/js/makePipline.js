@@ -4,6 +4,8 @@ export default (
   presentationFormat,
   shaderModule,
   vEntryPoint,
+  arrayStride,
+  attributes,
   topology,
   fEntryPoint = "fs_main",
   isMask,
@@ -23,14 +25,15 @@ export default (
       entryPoint: vEntryPoint,
       buffers: [
         {
-          arrayStride: 12,
+          arrayStride: arrayStride,
           stepMode: "vertex",
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: "sint16x2" }, // 座標 -> シェーダーの @location(0)
-            { shaderLocation: 1, offset: 4, format: "sint16" }, // 属性ID -> @location(1)
-            // offset: 6 のパディング2バイトは自動的にスキップされる
-            { shaderLocation: 2, offset: 8, format: "sint16x2" }, // 法線 -> @location(2)
-          ],
+          attributes: attributes.map((a, i) => {
+            return {
+              shaderLocation: i,
+              offset: a[0],
+              format: a[1],
+            };
+          }),
         },
       ],
     },

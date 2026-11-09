@@ -103,6 +103,8 @@ async function init(viewArray) {
     presentationFormat,
     shaderModule,
     "vs_mask",
+    0,
+    [],
     "triangle-strip",
     "fs_dummy",
     true,
@@ -121,6 +123,11 @@ async function init(viewArray) {
       presentationFormat,
       shaderModule,
       "vs_polygon",
+      8,
+      [
+        [0, "sint16x2"],
+        [4, "sint16"],
+      ],
       "triangle-list",
     ),
   );
@@ -132,6 +139,11 @@ async function init(viewArray) {
       presentationFormat,
       shaderModule,
       "vs_thinline",
+      8,
+      [
+        [0, "sint16x2"],
+        [4, "sint16"],
+      ],
       "line-list",
     ),
   );
@@ -143,6 +155,12 @@ async function init(viewArray) {
       presentationFormat,
       shaderModule,
       "vs_polyline",
+      12,
+      [
+        [0, "sint16x2"],
+        [4, "sint16"],
+        [8, "sint16x2"],
+      ],
       "triangle-list",
       "fs_polyline",
     ),
@@ -225,7 +243,7 @@ async function init(viewArray) {
     var tileData = await loadTile(zxy);
     // console.log("tiledata:", tileData);
     const drawData = onCreateTile(device, tileData, zxy);
-    console.log({ drawData });
+    // console.log({ drawData });
     visibleTiles.push(drawData);
   }
 
@@ -299,7 +317,7 @@ async function init(viewArray) {
       renderPass.draw(4, 1, 0, 0);
     }
 
-    for (let j = 0; j < piplines.length; j++) {
+    for (let j = 0; j < 4; j++) {
       const pidx = [0, 1, 1, 2];
       if (j != 2) {
         renderPass.setPipeline(piplines[pidx[j]]);

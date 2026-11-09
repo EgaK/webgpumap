@@ -1,6 +1,10 @@
 struct Vertex {
   @location(0) pos: vec2i,
   @location(1) style_id: i32,
+}
+struct eVertex {
+  @location(0) pos: vec2i,
+  @location(1) style_id: i32,
   @location(2) normal: vec2i,
 }
 
@@ -77,7 +81,7 @@ fn vs_thinline(input:Vertex) -> VertexOutput {
 
 @vertex
 fn vs_polyline(
-  input: Vertex,
+  input: eVertex,
 ) -> VertexOutput {
   var output: VertexOutput;
   let prop = uniforms.styles[input.style_id];

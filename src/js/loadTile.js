@@ -37,10 +37,12 @@ export default async (zxy) => {
     }
   }
   return [
-    [polygonVertex, polygonIndex],
-    [0, borderIndex],
-    [thinVertex, thinIndex],
-    [lineVertex, lineIndex],
+    [polygonVertex, [], thinVertex, lineVertex],
+    [polygonIndex, borderIndex, thinIndex, lineIndex],
+    // [polygonVertex, polygonIndex],
+    // [0, borderIndex],
+    // [thinVertex, thinIndex],
+    // [lineVertex, lineIndex],
   ];
 
   function makeFeatures(layer, prop, zxy) {
@@ -92,11 +94,9 @@ export default async (zxy) => {
     if (prop.Type == "f") {
       for (var i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
-        // console.log("feature.type", feature.type, feature);
         if (feature.type !== 3) continue; // Polygon 以外はスキップ
 
         const geometry = feature.loadGeometry().lines;
-        // console.log(geometry);
         let currentPolygonRings = [];
 
         for (const ring of geometry) {
@@ -150,7 +150,7 @@ export default async (zxy) => {
   function addThin(points, styleId) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      thinVertex.push(...p, styleId, 0, 0, 0); //末尾の1はアライメントのパディング
+      thinVertex.push(...p, styleId, 0); //末尾の1はアライメントのパディング
       if (i < points.length - 1) {
         thinIndex.push(thinIndexBase + i, thinIndexBase + i + 1);
       }
@@ -180,7 +180,7 @@ export default async (zxy) => {
         // earcut用
         earcutRawData.push(p[0], p[1]);
 
-        polygonVertex.push(...p, styleId, 0, 0, 0); // 全部の頂点バッファの形式を揃えるために
+        polygonVertex.push(...p, styleId, 0); // 全部の頂点バッファの形式を揃えるために
         currentVertexCount++;
 
         // 枠線（折れ線）用の処理
