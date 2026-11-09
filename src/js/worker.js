@@ -5,14 +5,15 @@ import loadTile from "./loadTile";
 import style from "./style";
 import makePipline from "./makePipline";
 import message from "./util/message";
-import transformMatrix from "./util/transformMatrix";
+import {
+  scale,
+  zxy2center,
+  transformMatrix,
+  packTileId,
+  unpackTileId,
+} from "./util/calc";
 
-var canvas,
-  size,
-  device,
-  styleUniformBuffer,
-  msaaColorTexture,
-  msaaDepthTexture;
+var canvas, size, device, msaaColorTexture, msaaDepthTexture;
 
 self.onmessage = async (e) => {
   if (e.data["c"]) {
@@ -175,7 +176,7 @@ async function init(viewArray) {
     }
   }
 
-  styleUniformBuffer = device.createBuffer({
+  const styleUniformBuffer = device.createBuffer({
     size: 512,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
@@ -238,6 +239,9 @@ async function init(viewArray) {
     [15, 28192, 13180],
     [15, 28191, 13179],
     [15, 28192, 13179],
+    // [10, 881, 412],
+    // [10, 880, 411],
+    // [10, 881, 411],
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile(zxy);
@@ -328,13 +332,9 @@ async function init(viewArray) {
           const dynamicOffset = i * 256;
           renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
           renderPass.setStencilReference(i + 1); // マスク領域を「i+1」に設定
-          renderPass.setVertexBuffer(
-            0,
-            tile.vertexBuffer,
-            tile.vOffsetArray[j],
-          );
+          renderPass.setVertexBuffer(0, tile.buffer, tile.vOffsetArray[j]);
           renderPass.setIndexBuffer(
-            tile.indexBuffer,
+            tile.buffer,
             "uint16",
             tile.iOffsetArray[j],
           );
@@ -351,7 +351,7 @@ async function init(viewArray) {
   render();
 }
 
-function updateCanvasSize(size) {
+const updateCanvasSize = (size) => {
   // 1. MSAA用のカラーテクスチャ（4倍サンプリング）
   msaaColorTexture = device.createTexture({
     size: size,
@@ -367,4 +367,4 @@ function updateCanvasSize(size) {
     format: "depth24plus-stencil8",
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
   });
-}
+};

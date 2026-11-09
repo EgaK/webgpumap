@@ -3,30 +3,27 @@ var shader_default = `struct Vertex{@location(0)pos:vec2i,@location(1)style_id:i
 
 // src/js/onCreateTile.js
 function onCreateTile(device2, tileData, zxy) {
-  const PAGE_VERTEX_SIZE = 256 * 1024;
-  const PAGE_INDEX_SIZE = 256 * 1024;
-  const vertexBuffer = device2.createBuffer({
-    size: PAGE_VERTEX_SIZE,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-  });
-  const indexBuffer = device2.createBuffer({
-    size: PAGE_INDEX_SIZE,
-    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+  const PAGE_SIZE = (1024 + 512) * 1024;
+  const buffer = device2.createBuffer({
+    size: PAGE_SIZE,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
   });
   let vOffset = 0;
   let vOffsetArray = [];
-  let iOffset = 0;
-  let iOffsetArray = [];
-  let lenArray = [];
   for (let i = 0; i < 4; i++) {
     const vtx = tileData[0][i];
-    const idx = tileData[1][i];
     if (vtx.length) {
       vOffsetArray.push(vOffset);
       vOffset += vtx.length * 2;
     } else {
       vOffsetArray.push(0);
     }
+  }
+  let iOffset = vOffset;
+  let iOffsetArray = [];
+  let lenArray = [];
+  for (let i = 0; i < 4; i++) {
+    const idx = tileData[1][i];
     let len = idx.length;
     if (len % 2 != 0) {
       const last = idx[len - 1];
@@ -38,23 +35,21 @@ function onCreateTile(device2, tileData, zxy) {
     lenArray.push(len);
   }
   device2.queue.writeBuffer(
-    vertexBuffer,
+    buffer,
     0,
     new Int16Array([].concat(...tileData[0]))
   );
   device2.queue.writeBuffer(
-    indexBuffer,
-    0,
+    buffer,
+    vOffset,
     new Uint16Array([].concat(...tileData[1]))
   );
   console.log(
-    Math.ceil([].concat(...tileData[0]).length / 512) + "KB",
-    Math.ceil([].concat(...tileData[1]).length / 512) + "KB"
+    Math.ceil([].concat(...tileData[0], ...tileData[1]).length / 512) + "KB"
   );
   return {
     zxy,
-    vertexBuffer,
-    indexBuffer,
+    buffer,
     vOffsetArray,
     iOffsetArray,
     lenArray
@@ -1933,9 +1928,9 @@ var baseTile = {
   tileSizePixels: 1024
 };
 
-// src/js/util/transformMatrix.js
+// src/js/util/calc.js
 var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
-var transformMatrix_default = (tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height) => {
+var transformMatrix = (tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height) => {
   const tilePixelSize = tileSizePixels * Math.pow(2, currentZoom - baseTileZ);
   const scaleX = tilePixelSize / width * 2;
   const scaleY = tilePixelSize / height * 2;
@@ -1960,7 +1955,6 @@ var transformMatrix_default = (tileZ, tileX, tileY, tileExtent, centerX, centerY
 var canvas;
 var size;
 var device;
-var styleUniformBuffer;
 var msaaColorTexture;
 var msaaDepthTexture;
 self.onmessage = async (e) => {
@@ -2101,7 +2095,7 @@ async function init(viewArray) {
       );
     }
   }
-  styleUniformBuffer = device.createBuffer({
+  const styleUniformBuffer = device.createBuffer({
     size: 512,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   });
@@ -2155,6 +2149,9 @@ async function init(viewArray) {
     [15, 28192, 13180],
     [15, 28191, 13179],
     [15, 28192, 13179]
+    // [10, 881, 412],
+    // [10, 880, 411],
+    // [10, 881, 411],
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);
@@ -2202,7 +2199,7 @@ async function init(viewArray) {
     renderPass.setPipeline(maskPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
-      const matrix = transformMatrix_default(
+      const matrix = transformMatrix(
         ...tile.zxy,
         4096,
         viewArray[0],
@@ -2232,13 +2229,9 @@ async function init(viewArray) {
           const dynamicOffset = i * 256;
           renderPass.setBindGroup(0, globalBindGroup, [dynamicOffset]);
           renderPass.setStencilReference(i + 1);
-          renderPass.setVertexBuffer(
-            0,
-            tile.vertexBuffer,
-            tile.vOffsetArray[j]
-          );
+          renderPass.setVertexBuffer(0, tile.buffer, tile.vOffsetArray[j]);
           renderPass.setIndexBuffer(
-            tile.indexBuffer,
+            tile.buffer,
             "uint16",
             tile.iOffsetArray[j]
           );
@@ -2253,7 +2246,7 @@ async function init(viewArray) {
   }
   render();
 }
-function updateCanvasSize(size2) {
+var updateCanvasSize = (size2) => {
   msaaColorTexture = device.createTexture({
     size: size2,
     sampleCount: 4,
@@ -2268,4 +2261,4 @@ function updateCanvasSize(size2) {
     format: "depth24plus-stencil8",
     usage: GPUTextureUsage.RENDER_ATTACHMENT
   });
-}
+};
