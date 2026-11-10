@@ -462,8 +462,8 @@ var VectorTileFeature = class {
    * @param {number} z
    * @return {Feature}
    */
-  toGeoJSON(x, y, z) {
-    const size2 = this.extent * Math.pow(2, z), x0 = this.extent * x, y0 = this.extent * y, vtCoords = this.loadGeometry();
+  toGeoJSON(x, y, z2) {
+    const size2 = this.extent * Math.pow(2, z2), x0 = this.extent * x, y0 = this.extent * y, vtCoords = this.loadGeometry();
     function projectPoint(p) {
       return [
         (p.x + x0) * 360 / size2 - 180,
@@ -1009,26 +1009,26 @@ function earcutLinked(ear, triangles, minX, minY, invSize) {
   }
 }
 function isEar(ear) {
-  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy);
+  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx2 = c.x, ay = a.y, by = b.y, cy2 = c.y, x0 = Math.min(ax, bx, cx2), y0 = Math.min(ay, by, cy2), x1 = Math.max(ax, bx, cx2), y1 = Math.max(ay, by, cy2);
   let p = c.next;
   while (p !== a) {
-    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
+    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx2, cy2, p.x, p.y) && area(p.prev, p, p.next) >= 0)
       return false;
     p = p.next;
   }
   return true;
 }
 function isEarHashed(ear, minX, minY, invSize) {
-  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx = c.x, ay = a.y, by = b.y, cy = c.y, x0 = Math.min(ax, bx, cx), y0 = Math.min(ay, by, cy), x1 = Math.max(ax, bx, cx), y1 = Math.max(ay, by, cy), minZ = zOrder(x0, y0, minX, minY, invSize), maxZ = zOrder(x1, y1, minX, minY, invSize);
+  const a = ear.prev, b = ear, c = ear.next, ax = a.x, bx = b.x, cx2 = c.x, ay = a.y, by = b.y, cy2 = c.y, x0 = Math.min(ax, bx, cx2), y0 = Math.min(ay, by, cy2), x1 = Math.max(ax, bx, cx2), y1 = Math.max(ay, by, cy2), minZ = zOrder(x0, y0, minX, minY, invSize), maxZ = zOrder(x1, y1, minX, minY, invSize);
   let p = ear.prevZ;
   while (p && p.z >= minZ) {
-    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p !== c && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx, cy, p.x, p.y) && area(p.prev, p, p.next) >= 0)
+    if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p !== c && !(ax === p.x && ay === p.y) && pointInTriangle(ax, ay, bx, by, cx2, cy2, p.x, p.y) && area(p.prev, p, p.next) >= 0)
       return false;
     p = p.prevZ;
   }
   let n = ear.nextZ;
   while (n && n.z <= maxZ) {
-    if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1 && n !== c && !(ax === n.x && ay === n.y) && pointInTriangle(ax, ay, bx, by, cx, cy, n.x, n.y) && area(n.prev, n, n.next) >= 0)
+    if (n.x >= x0 && n.x <= x1 && n.y >= y0 && n.y <= y1 && n !== c && !(ax === n.x && ay === n.y) && pointInTriangle(ax, ay, bx, by, cx2, cy2, n.x, n.y) && area(n.prev, n, n.next) >= 0)
       return false;
     n = n.nextZ;
   }
@@ -1263,9 +1263,9 @@ function indexCurve(start, minX, minY, invSize) {
 function sortNodes(n) {
   if (n <= 32) {
     for (let i = 1; i < n; i++) {
-      const node = sortArr[i], z = node.z;
+      const node = sortArr[i], z2 = node.z;
       let j = i - 1;
-      while (j >= 0 && sortArr[j].z > z) {
+      while (j >= 0 && sortArr[j].z > z2) {
         sortArr[j + 1] = sortArr[j];
         j--;
       }
@@ -1294,10 +1294,10 @@ function radixPass(n, src, srcZ, dst, dstZ, shift) {
     sum += c;
   }
   for (let i = 0; i < n; i++) {
-    const z = srcZ[i];
-    const pos = counts[z >>> shift & 255]++;
+    const z2 = srcZ[i];
+    const pos = counts[z2 >>> shift & 255]++;
     dst[pos] = src[i];
-    dstZ[pos] = z;
+    dstZ[pos] = z2;
   }
 }
 function zOrder(x, y, minX, minY, invSize) {
@@ -1322,8 +1322,8 @@ function getLeftmost(start) {
   } while (p !== start);
   return leftmost;
 }
-function pointInTriangle(ax, ay, bx, by, cx, cy, px, py) {
-  return (cx - px) * (ay - py) >= (ax - px) * (cy - py) && (ax - px) * (by - py) >= (bx - px) * (ay - py) && (bx - px) * (cy - py) >= (cx - px) * (by - py);
+function pointInTriangle(ax, ay, bx, by, cx2, cy2, px, py) {
+  return (cx2 - px) * (ay - py) >= (ax - px) * (cy2 - py) && (ax - px) * (by - py) >= (bx - px) * (ay - py) && (bx - px) * (cy2 - py) >= (cx2 - px) * (by - py);
 }
 function isValidDiagonal(a, b) {
   const zeroLength = equals(a, b) && area(a.prev, a, a.next) > 0 && area(b.prev, b, b.next) > 0;
@@ -1930,6 +1930,14 @@ var baseTile = {
 
 // src/js/util/calc.js
 var { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
+var coodToTile = (x, y, z2) => {
+  z2 = z2 >= 16 ? 15 : z2 >= 13 ? 13 : 10;
+  const s = Math.pow(2, z2 - baseTileZ);
+  const tileX = ~~((baseTileX + x) * s);
+  const tileY = ~~((baseTileY + y) * s);
+  return [tileX, tileY];
+};
+console.log("coodToTile", coodToTile(1.984375, 1.890625, 14));
 var transformMatrix = (tileZ, tileX, tileY, tileExtent, centerX, centerY, currentZoom, width, height) => {
   const tilePixelSize = tileSizePixels * Math.pow(2, currentZoom - baseTileZ);
   const scaleX = tilePixelSize / width * 2;
@@ -2145,13 +2153,14 @@ async function init(viewArray) {
   });
   const visibleTiles = [];
   var zxys = [
-    [15, 28191, 13180],
-    [15, 28192, 13180],
-    [15, 28191, 13179],
-    [15, 28192, 13179]
-    // [10, 881, 412],
+    // [15, 28191, 13180],
+    // [15, 28192, 13180],
+    // [15, 28191, 13179],
+    // [15, 28192, 13179],
+    // [10, 880, 411],
     // [10, 880, 411],
     // [10, 881, 411],
+    [13, 7047, 3295]
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile_default(zxy);

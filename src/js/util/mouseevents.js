@@ -1,20 +1,60 @@
+import $ from "./tiny";
 import { scale } from "./calc";
 import context from "./context";
+import { setCenter, setZoom } from "./controller";
 
+export default (container) => {
+  container = $(container);
+
+  container
+    .on(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+
+        // 基準ズーム(z=10)の「タイル1枚の幅」を現在の画面ピクセル数に換算したスケール
+        const oldScale = context.scaleZ;
+
+        var dz = e.deltaY;
+        dz = dz > 5 ? 5 : dz < -5 ? -5 : dz;
+        var z = context.zoom - dz / 100;
+        z = Math.max(10, Math.min(z, 20));
+        if (context.zoom == z) return;
+
+        setZoom(z);
+
+        const dx = context.mapWidth / 2 - e.offsetX;
+        const dy = context.mapHeight / 2 - e.offsetY;
+
+        const x = context.centerX + dx / context.scaleZ - dx / oldScale;
+        const y = context.centerY + dy / context.scaleZ - dy / oldScale;
+
+        setCenter(x, y);
+      },
+      { passive: false },
+    )
+    .on("mousedown", (e) => {
+      const startCenterX = context.centerX;
+      const startCenterY = context.centerY;
+      const startX = e.offsetX;
+      const startY = e.offsetY;
+      const fnc = (e) => {
+        const x = startCenterX + (startX - e.offsetX) / context.scaleZ;
+        const y = startCenterY + (startY - e.offsetY) / context.scaleZ;
+        setCenter(x, y);
+      };
+      container.on("mousemove", fnc).one("mouseup", () => {
+        container.off("mousemove", fnc);
+      });
+    });
+};
+/*
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
-let scaleZ = scale(15);
 
-export default (viewArray) => {
+export default () => {
   const canvas = document.getElementById("a");
 
-  const v = document.getElementById("zoom");
-  const view = () => {
-    requestAnimationFrame(view);
-    if (!viewArray[3]) return;
-    v.innerText = `zoom: ${viewArray[2].toFixed(2)}, x:${viewArray[0].toFixed(8)}, y:${viewArray[1].toFixed(8)}`;
-  };
-  view();
   // ------------------------------------------
   // 7. マウス・ホイールイベントの追加
   // ------------------------------------------
@@ -24,7 +64,7 @@ export default (viewArray) => {
       e.preventDefault();
 
       // 基準ズーム(z=10)の「タイル1枚の幅」を現在の画面ピクセル数に換算したスケール
-      const oldScale = scaleZ;
+      const oldScale = context.scaleZ;
 
       var dz = e.deltaY;
       dz = dz > 5 ? 5 : dz < -5 ? -5 : dz;
@@ -32,15 +72,15 @@ export default (viewArray) => {
       z = Math.max(10, Math.min(z, 20));
       if (viewArray[2] == z) return;
 
-      viewArray[2] = z;
-      scaleZ = scale(z);
+      setZoom(z);
 
-      const x = context.mapWidth / 2 - e.offsetX;
-      const y = context.mapHeight / 2 - e.offsetY;
+      const dx = context.mapWidth / 2 - e.offsetX;
+      const dy = context.mapHeight / 2 - e.offsetY;
 
-      viewArray[0] -= x / oldScale - x / scaleZ;
-      viewArray[1] -= y / oldScale - y / scaleZ;
-      viewArray[3] = 1;
+      const x = context.centerX + dx / context.scaleZ - dx / oldScale;
+      const y = context.centerY + dy / context.scaleZ - dy / oldScale;
+
+      setCenter(x, y);
     },
     { passive: false },
   );
@@ -60,7 +100,7 @@ export default (viewArray) => {
     const deltaY = e.clientY - previousMousePosition.y;
 
     // ズーム倍率に応じて移動量を調整
-    viewArray[0] -= deltaX / scaleZ;
+    const dx = deltaX / context.scaleZ;
     viewArray[1] -= deltaY / scaleZ;
 
     previousMousePosition = { x: e.clientX, y: e.clientY };
@@ -156,3 +196,4 @@ export default (viewArray) => {
     initialTouchDistance = 0;
   });
 };
+*/

@@ -1,8 +1,34 @@
 import { baseTile } from "./constants";
+import context from "./context";
 const { baseTileZ, baseTileX, baseTileY, tileSizePixels } = baseTile;
 
 const scale = (z) => {
   return (tileSizePixels / 2) * Math.pow(2, z - baseTileZ);
+};
+
+// workerで計算することを目的にしているので、x，y，w，hはメインの2倍の値
+const pixToLocalCoord = (x, y, w, h, cx, cy, z) => {
+  const s = scale(z) * 2;
+  x = w / 2 - x;
+  y = h / 2 - y;
+  return [cx - x / s, cy - y / s];
+};
+
+const coodToTile = (x, y, z) => {
+  z = z >= 16 ? 15 : z >= 13 ? 13 : 10;
+  const s = Math.pow(2, z - baseTileZ);
+  const tileX = ~~((baseTileX + x) * s);
+  const tileY = ~~((baseTileY + y) * s);
+  return [tileX, tileY];
+};
+
+console.log("coodToTile", coodToTile(1.984375, 1.890625, 14));
+
+const getBound = (w, h) => {
+  return [
+    pixToLocalCoord(0, 0, w, h, cx, cy, z),
+    pixToLocalCoord(w, h, w, h, cx, cy, z),
+  ];
 };
 
 const zxy2center = (zxy) => {
@@ -110,4 +136,11 @@ const unpackTileId = (id) => {
   return { z, x, y };
 };
 
-export { scale, zxy2center, transformMatrix, packTileId, unpackTileId };
+export {
+  scale,
+  pixToLocalCoord,
+  zxy2center,
+  transformMatrix,
+  packTileId,
+  unpackTileId,
+};

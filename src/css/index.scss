@@ -58,3 +58,30 @@ canvas {
     align-items: center; /* 上下の中央 */
     height: 800px; /* 親の高さが必要 */
 }
+#x {
+    position: absolute;
+    z-index: 5;
+    inset: 50%;
+    margin: -12px;
+    stroke: #257dff;
+}
+svg:not(.o),
+.ico {
+    &,
+    ~ *,
+    * ~ & {
+        vertical-align: middle;
+    }
+}
+svg:not(.o),
+.ico {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    pointer-events: none;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke: #ffa725;
+}
