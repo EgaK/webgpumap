@@ -6,8 +6,7 @@ import style from "./style";
 import makePipline from "./makePipline";
 import message from "./util/message";
 import {
-  scale,
-  zxy2center,
+  requiredTiles,
   transformMatrix,
   packTileId,
   unpackTileId,
@@ -181,7 +180,7 @@ async function init(viewArray) {
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
   const megaMatrixBuffer = device.createBuffer({
-    size: 50 * 256,
+    size: 50 * 128,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
@@ -235,14 +234,14 @@ async function init(viewArray) {
 
   const visibleTiles = [];
   var zxys = [
-    // [15, 28191, 13180],
+    [15, 28191, 13180],
     // [15, 28192, 13180],
     // [15, 28191, 13179],
     // [15, 28192, 13179],
     // [10, 880, 411],
     // [10, 880, 411],
     // [10, 881, 411],
-    [13, 7047, 3295],
+    // [13, 7047, 3295],
   ];
   for (const zxy of zxys) {
     var tileData = await loadTile(zxy);
@@ -292,9 +291,33 @@ async function init(viewArray) {
       new Float32Array([viewArray[2]]),
     );
 
+    const reqT = requiredTiles(
+      viewArray[0],
+      viewArray[1],
+      viewArray[2],
+      ...size,
+    );
+    console.log("必要なタイル：", reqT);
+    const testTiles = [];
+    // new Promise((resolve) => {
+    //   setTimeout(() => {
+    //     testTiles.push({ "foo": true });
+    //     resolve();
+    //     viewArray[3] = 1;
+    //   }, 300);
+    // });
+    // new Promise((resolve) => {
+    //   setTimeout(() => {
+    //     testTiles.push({ "bar": true });
+    //     resolve();
+    //     viewArray[3] = 1;
+    //   }, 3000);
+    // });
+
+    console.log("testTile:", testTiles);
+
     // 全タイルの変換行列を書き込む
-    // 256バイト = f32の64個分
-    const matrixUploadData = new Float32Array(visibleTiles.length * 64);
+    const matrixUploadData = new Float32Array(visibleTiles.length * 32);
     renderPass.setPipeline(maskPipeline);
     for (let i = 0; i < visibleTiles.length; i++) {
       const tile = visibleTiles[i];
@@ -306,7 +329,7 @@ async function init(viewArray) {
         viewArray[2],
         ...size,
       );
-      const offsetInFloat32 = i * 64;
+      const offsetInFloat32 = i * 32;
       matrixUploadData.set(matrix, offsetInFloat32);
     }
     //  まとめて 1回の writeBuffer で GPU へ一括転送！

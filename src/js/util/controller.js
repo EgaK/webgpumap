@@ -32,8 +32,8 @@ const init = (w, h) => {
   canvas = $("canvas");
   const offcanvas = canvas[0].transferControlToOffscreen();
 
-  setCenter(1.984375, 1.890625);
-  setZoom(15);
+  setCenter(1.97598457, 1.87735462);
+  setZoom(16);
   resize(w, h, 1);
   worker.postMessage(
     {

@@ -7,7 +7,7 @@ const scale = (z) => {
 };
 
 // workerで計算することを目的にしているので、x，y，w，hはメインの2倍の値
-const pixToLocalCoord = (x, y, w, h, cx, cy, z) => {
+const pixToLocalCoord = (x, y, cx, cy, z, w, h) => {
   const s = scale(z) * 2;
   x = w / 2 - x;
   y = h / 2 - y;
@@ -19,34 +19,45 @@ const coodToTile = (x, y, z) => {
   const s = Math.pow(2, z - baseTileZ);
   const tileX = ~~((baseTileX + x) * s);
   const tileY = ~~((baseTileY + y) * s);
-  return [tileX, tileY];
+  return [z, tileX, tileY];
 };
 
-console.log("coodToTile", coodToTile(1.984375, 1.890625, 14));
-
-const getBound = (w, h) => {
+const getBounds = (cx, cy, z, w, h) => {
   return [
-    pixToLocalCoord(0, 0, w, h, cx, cy, z),
-    pixToLocalCoord(w, h, w, h, cx, cy, z),
+    pixToLocalCoord(0, 0, cx, cy, z, w, h),
+    pixToLocalCoord(w, h, cx, cy, z, w, h),
   ];
 };
 
-const zxy2center = (zxy) => {
-  // const scale = Math.pow(2, zxy[0]);
-  const zoomDiff = zxy[0] - baseTileZ;
-  const shiftedBaseX = baseTileX * Math.pow(2, zoomDiff);
-  const shiftedBaseY = baseTileY * Math.pow(2, zoomDiff);
-
-  // 基準タイルから「描画対象のタイル」までの、そのズーム(tileZ)における枚数差（整数）
-  const localTileX = zxy[1] + 0.5 - shiftedBaseX;
-  const localTileY = zxy[2] + 0.5 - shiftedBaseY;
-
-  // それを基準ズーム（z=10）のタイル枚数単位の距離にリスケールする（桁落ちしない）
-  const tileScaleFromBase = 1.0 / Math.pow(2, zoomDiff);
-  const tileLocalWorldX = localTileX * tileScaleFromBase;
-  const tileLocalWorldY = localTileY * tileScaleFromBase;
-  return [tileLocalWorldX, tileLocalWorldY];
+var requiredTiles = (cx, cy, z, w, h) => {
+  var b = getBounds(cx, cy, z, w, h);
+  var nw = coodToTile(...b[0], z);
+  var se = coodToTile(...b[1], z);
+  var t = [];
+  for (var i = nw[1]; i <= se[1]; i++) {
+    for (var j = nw[2]; j <= se[2]; j++) {
+      t.push([nw[0], i, j]);
+    }
+  }
+  return t;
 };
+
+// const zxy2center = (zxy) => {
+//   // const scale = Math.pow(2, zxy[0]);
+//   const zoomDiff = zxy[0] - baseTileZ;
+//   const shiftedBaseX = baseTileX * Math.pow(2, zoomDiff);
+//   const shiftedBaseY = baseTileY * Math.pow(2, zoomDiff);
+//
+//   // 基準タイルから「描画対象のタイル」までの、そのズーム(tileZ)における枚数差（整数）
+//   const localTileX = zxy[1] + 0.5 - shiftedBaseX;
+//   const localTileY = zxy[2] + 0.5 - shiftedBaseY;
+//
+//   // それを基準ズーム（z=10）のタイル枚数単位の距離にリスケールする（桁落ちしない）
+//   const tileScaleFromBase = 1.0 / Math.pow(2, zoomDiff);
+//   const tileLocalWorldX = localTileX * tileScaleFromBase;
+//   const tileLocalWorldY = localTileY * tileScaleFromBase;
+//   return [tileLocalWorldX, tileLocalWorldY];
+// };
 
 const transformMatrix = (
   tileZ,
@@ -139,7 +150,8 @@ const unpackTileId = (id) => {
 export {
   scale,
   pixToLocalCoord,
-  zxy2center,
+  requiredTiles,
+  // zxy2center,
   transformMatrix,
   packTileId,
   unpackTileId,
